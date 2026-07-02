@@ -1,56 +1,38 @@
 import { useState } from 'react';
-import { GitBranch, Phone, Lock, User, KeyRound, ArrowRight, Sparkles, Mail } from 'lucide-react';
+import { GitBranch, Phone, Lock, User, KeyRound, ArrowRight, Mail, IdCard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
-  const { login, register, sendCode } = useAuth();
+  const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
-  // login state
-  const [loginPhone, setLoginPhone] = useState('');
+  // login state: 姓名 + 密码
+  const [loginName, setLoginName] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // register state
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regEmail, setRegEmail] = useState('');
+  const [regIdCard, setRegIdCard] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regCode, setRegCode] = useState('');
-  const [sentCode, setSentCode] = useState('');
-  const [codeSending, setCodeSending] = useState(false);
 
   const [error, setError] = useState('');
 
-  const handleSendCode = () => {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) {
-      setError('请输入有效的邮箱以接收验证码');
-      return;
-    }
-    setCodeSending(true);
-    setError('');
-    const { code } = sendCode(regEmail.trim());
-    setSentCode(code);
-    setCodeSending(false);
-  };
-
   const handleLogin = () => {
     setError('');
-    const res = login(loginPhone, loginPassword);
+    const res = login(loginName, loginPassword);
     if (!res.ok) setError(res.error ?? '登录失败');
   };
 
   const handleRegister = () => {
     setError('');
-    // 校验验证码是否与发送的一致
-    if (!sentCode) {
-      setError('请先获取邮箱验证码');
-      return;
-    }
-    if (regCode.trim() !== sentCode) {
-      setError('验证码不正确');
-      return;
-    }
-    const res = register(regName, regPhone, regEmail, regPassword, regCode);
+    const res = register({
+      name: regName, phone: regPhone, email: regEmail, idCard: regIdCard,
+      password: regPassword, confirmPassword: regConfirmPassword, code: regCode,
+    });
     if (!res.ok) setError(res.error ?? '注册失败');
   };
 
@@ -107,15 +89,15 @@ export default function Login() {
             </div>
           )}
 
-          {/* 登录表单 */}
+          {/* 登录表单：姓名 + 密码 */}
           {mode === 'login' && (
             <div className="space-y-4">
-              <Field icon={<Phone className="w-4 h-4" />} label="手机号">
+              <Field icon={<User className="w-4 h-4" />} label="姓名">
                 <input
-                  type="tel"
-                  value={loginPhone}
-                  onChange={(e) => setLoginPhone(e.target.value)}
-                  placeholder="请输入手机号"
+                  type="text"
+                  value={loginName}
+                  onChange={(e) => setLoginName(e.target.value)}
+                  placeholder="请输入姓名"
                   className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50"
                 />
               </Field>
@@ -131,89 +113,98 @@ export default function Login() {
               </Field>
               <button
                 onClick={handleLogin}
-                disabled={!loginPhone || !loginPassword}
+                disabled={!loginName || !loginPassword}
                 className="w-full h-10 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
                 登录 <ArrowRight className="w-4 h-4" />
               </button>
-              <p className="text-center text-xs text-[#969699]">
-                管理员：13800000001 / fuxueying
-              </p>
             </div>
           )}
 
           {/* 注册表单 */}
           {mode === 'register' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <Field icon={<User className="w-4 h-4" />} label="姓名（真实中文姓名）">
                 <input
                   type="text"
                   value={regName}
                   onChange={(e) => setRegName(e.target.value)}
                   placeholder="如：陈润峰"
-                  className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50"
+                  className="reg-input"
                 />
               </Field>
-              <Field icon={<Phone className="w-4 h-4" />} label="手机号">
+              <Field icon={<Phone className="w-4 h-4" />} label="手机号 *">
                 <input
                   type="tel"
                   value={regPhone}
                   onChange={(e) => setRegPhone(e.target.value)}
                   placeholder="11 位手机号"
-                  className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50"
+                  className="reg-input"
                 />
               </Field>
-              <Field icon={<Mail className="w-4 h-4" />} label="邮箱（接收验证码）">
+              <Field icon={<Mail className="w-4 h-4" />} label="邮箱 *">
                 <input
                   type="email"
                   value={regEmail}
-                  onChange={(e) => { setRegEmail(e.target.value); setSentCode(''); }}
+                  onChange={(e) => setRegEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50"
+                  className="reg-input"
                 />
               </Field>
-              <Field icon={<Lock className="w-4 h-4" />} label="密码">
+              <Field icon={<IdCard className="w-4 h-4" />} label="身份证号">
                 <input
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="至少 6 位"
-                  className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50"
+                  type="text"
+                  value={regIdCard}
+                  onChange={(e) => setRegIdCard(e.target.value)}
+                  placeholder="18 位身份证号"
+                  className="reg-input font-mono"
                 />
               </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field icon={<Lock className="w-4 h-4" />} label="密码">
+                  <input
+                    type="password"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    placeholder="至少 6 位"
+                    className="reg-input"
+                  />
+                </Field>
+                <Field icon={<Lock className="w-4 h-4" />} label="确认密码">
+                  <input
+                    type="password"
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    placeholder="再输入一次"
+                    className="reg-input"
+                  />
+                </Field>
+              </div>
               <div>
-                <label className="text-xs text-[#969699] mb-1.5 block">邮箱验证码</label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#969699]" />
-                    <input
-                      type="text"
-                      value={regCode}
-                      onChange={(e) => setRegCode(e.target.value)}
-                      placeholder="6 位验证码"
-                      maxLength={6}
-                      className="w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50 font-mono tracking-widest"
-                    />
-                  </div>
-                  <button
-                    onClick={handleSendCode}
-                    disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim()) || codeSending}
-                    className="px-3 h-10 rounded bg-[#1f1f22] text-xs text-[#969699] hover:text-[#f4f4f5] disabled:opacity-40 transition-colors whitespace-nowrap"
-                  >
-                    {codeSending ? '发送中...' : '获取验证码'}
-                  </button>
+                <label className="text-xs text-[#969699] mb-1.5 block">
+                  验证码
+                  <span className="text-[10px] text-[#1868d6] ml-2">= 身份证后6位 + 手机号后4位</span>
+                </label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#969699]" />
+                  <input
+                    type="text"
+                    value={regCode}
+                    onChange={(e) => setRegCode(e.target.value)}
+                    placeholder="10 位验证码"
+                    maxLength={10}
+                    className="reg-input pl-9 font-mono tracking-wider"
+                  />
                 </div>
-                {sentCode && (
-                  <p className="mt-1.5 text-[10px] text-[#10b981] flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    验证码已发送至 {regEmail.trim()}。演示模式验证码：
-                    <span className="font-mono font-bold tracking-wider">{sentCode}</span>
+                {regIdCard.trim().length >= 6 && regPhone.trim().length >= 11 && (
+                  <p className="mt-1.5 text-[10px] text-[#1868d6] font-mono">
+                    提示：{regIdCard.trim().slice(-6)} + {regPhone.trim().slice(-4)} = {regIdCard.trim().slice(-6) + regPhone.trim().slice(-4)}
                   </p>
                 )}
               </div>
               <button
                 onClick={handleRegister}
-                disabled={!regName || !regPhone || !regEmail || !regPassword || !regCode}
+                disabled={!regName || !regPhone || !regEmail || !regIdCard || !regPassword || !regConfirmPassword || !regCode}
                 className="w-full h-10 rounded-lg bg-[#10b981] hover:bg-[#10b981]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
               >
                 注册并登录 <ArrowRight className="w-4 h-4" />
@@ -226,7 +217,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-[10px] text-[#969699] mt-6 font-mono">
-          GitWeave v3.0 · 内部团队平台
+          GitWeave v3.2 · 内部团队平台
         </p>
       </div>
     </div>

@@ -73,6 +73,7 @@ export interface TeamMember {
   phone: string;
   password: string;
   email?: string;
+  idCard?: string;
 }
 
 // ============================================================

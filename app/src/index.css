@@ -103,6 +103,10 @@
     @apply bg-gray-500/20 text-gray-400 border border-gray-500/30;
   }
 
+  .reg-input {
+    @apply w-full h-10 pl-9 pr-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#10b981]/50 transition-colors;
+  }
+
   .status-todo {
     @apply bg-red-500/10 text-red-400;
   }

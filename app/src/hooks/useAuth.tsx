@@ -14,9 +14,16 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   users: TeamMember[];
-  login: (phone: string, password: string) => { ok: boolean; error?: string };
-  register: (name: string, phone: string, email: string, password: string, code: string) => { ok: boolean; error?: string };
-  sendCode: (email: string) => { code: string };
+  login: (name: string, password: string) => { ok: boolean; error?: string };
+  register: (data: {
+    name: string;
+    phone: string;
+    email: string;
+    idCard: string;
+    password: string;
+    confirmPassword: string;
+    code: string;
+  }) => { ok: boolean; error?: string };
   logout: () => void;
 }
 
@@ -61,41 +68,14 @@ function persistPool(pool: TeamMember[]) {
   try { localStorage.setItem(POOL_KEY, JSON.stringify(extra)); } catch { /* ignore */ }
 }
 
-// EmailJS 配置 —— 留空则降级为演示模式（界面显示验证码）
-const EMAILJS_SERVICE_ID = '';
-const EMAILJS_TEMPLATE_ID = '';
-const EMAILJS_PUBLIC_KEY = '';
-
-async function sendEmailCode(email: string, code: string): Promise<boolean> {
-  if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) return false;
-  try {
-    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_id: EMAILJS_SERVICE_ID,
-        template_id: EMAILJS_TEMPLATE_ID,
-        user_id: EMAILJS_PUBLIC_KEY,
-        template_params: { to_email: email, code, app_name: 'GitWeave' },
-      }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-function genCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadUser);
   const [users, setUsers] = useState<TeamMember[]>(loadPool);
 
-  const login = useCallback((phone: string, password: string): { ok: boolean; error?: string } => {
-    const found = users.find((m) => m.phone === phone.trim());
-    if (!found) return { ok: false, error: '该手机号未注册' };
+  // 登录：姓名 + 密码
+  const login = useCallback((name: string, password: string): { ok: boolean; error?: string } => {
+    const found = users.find((m) => m.name === name.trim());
+    if (!found) return { ok: false, error: '该姓名未注册' };
     if (found.password !== password) return { ok: false, error: '密码错误' };
     const authUser = toAuthUser(found);
     setUser(authUser);
@@ -103,22 +83,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [users]);
 
-  const sendCode = useCallback((_email: string): { code: string } => {
-    // 生成 6 位随机验证码；EmailJS 未配置时返回 code 供界面演示显示
-    const code = genCode();
-    // 异步发送邮件，不阻塞；未配置时静默降级
-    void sendEmailCode(_email, code);
-    return { code };
-  }, []);
+  const register = useCallback((data: {
+    name: string; phone: string; email: string; idCard: string;
+    password: string; confirmPassword: string; code: string;
+  }): { ok: boolean; error?: string } => {
+    const { name, phone, email, idCard, password, confirmPassword, code } = data;
 
-  const register = useCallback((name: string, phone: string, email: string, password: string, code: string): { ok: boolean; error?: string } => {
     if (!name.trim()) return { ok: false, error: '请输入真实姓名' };
     if (!/^1\d{10}$/.test(phone.trim())) return { ok: false, error: '请输入有效的 11 位手机号' };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return { ok: false, error: '请输入有效的邮箱' };
+    if (idCard.trim().length < 6) return { ok: false, error: '请输入有效的身份证号' };
     if (password.length < 6) return { ok: false, error: '密码至少 6 位' };
+    if (password !== confirmPassword) return { ok: false, error: '两次密码不一致' };
 
-    // 验证码校验：sendCode 返回的 code 由 Login 组件持有并传入比对
-    if (!code.trim()) return { ok: false, error: '请输入邮箱收到的验证码' };
+    // 验证码 = 身份证后6位 + 手机号后4位
+    const expectedCode = idCard.trim().slice(-6) + phone.trim().slice(-4);
+    if (code.trim() !== expectedCode) {
+      return { ok: false, error: `验证码不正确（应为身份证后6位+手机号后4位：${expectedCode}）` };
+    }
 
     if (users.some((m) => m.phone === phone.trim())) return { ok: false, error: '该手机号已注册' };
 
@@ -131,12 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const role = matched ? matched.role : '普通成员';
     const userRole = matched ? matched.userRole : 'member' as const;
 
-    // 如果匹配到现有成员，更新其 phone/password/email（首次绑定账号）
     let newPool: TeamMember[];
     if (matched) {
       newPool = users.map((m) =>
         m.id === matched.id
-          ? { ...m, phone: phone.trim(), password, email: email.trim() }
+          ? { ...m, phone: phone.trim(), password, email: email.trim(), idCard: idCard.trim() }
           : m
       );
     } else {
@@ -145,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role, initials, color, userRole,
         status: 'active',
         joinedAt: new Date().toISOString().split('T')[0],
-        phone: phone.trim(), password, email: email.trim(),
+        phone: phone.trim(), password, email: email.trim(), idCard: idCard.trim(),
       };
       newPool = [...users, newMember];
     }
@@ -165,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, users, login, register, sendCode, logout }}>
+    <AuthContext.Provider value={{ user, users, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
