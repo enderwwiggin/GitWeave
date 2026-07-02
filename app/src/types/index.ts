@@ -70,6 +70,8 @@ export interface TeamMember {
   userRole: UserRole;
   status: 'active' | 'inactive';
   joinedAt: string;
+  phone: string;
+  password: string;
 }
 
 // ============================================================

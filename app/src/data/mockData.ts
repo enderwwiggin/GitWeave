@@ -15,57 +15,68 @@ export const teamMembers: TeamMember[] = [
     id: 'a1', name: '傅雪影', avatar: '/team-avatars.png',
     role: 'Admin', initials: 'FX', color: '#dc2626',
     userRole: 'admin', status: 'active', joinedAt: '2025-01-01',
+    phone: '13800000001', password: 'fuxueying',
   },
   {
     id: 'a2', name: '赵海涛', avatar: '/team-avatars.png',
     role: 'Admin', initials: 'ZH', color: '#7c3aed',
     userRole: 'admin', status: 'active', joinedAt: '2025-01-01',
+    phone: '13800000002', password: 'zhaohaitao',
   },
   // -- Members --
   {
     id: 'm1', name: '陈润峰', avatar: '/team-avatars.png',
     role: '硬件负责人', initials: 'CR', color: '#1868d6',
     userRole: 'member', status: 'active', joinedAt: '2026-03-01',
+    phone: '13800000011', password: 'chenrunfeng',
   },
   {
     id: 'm2', name: '王一帆', avatar: '/team-avatars.png',
     role: '触觉研发', initials: 'WY', color: '#10b981',
     userRole: 'member', status: 'active', joinedAt: '2026-03-01',
+    phone: '13800000012', password: 'wangyifan',
   },
   {
     id: 'm3', name: '薛炫豪', avatar: '/team-avatars.png',
     role: '算法工程师', initials: 'XX', color: '#d7244b',
     userRole: 'member', status: 'active', joinedAt: '2026-03-15',
+    phone: '13800000013', password: 'xuexuanhao',
   },
   {
     id: 'm4', name: '武鸿旭', avatar: '/team-avatars.png',
     role: '工程师', initials: 'WH', color: '#f59e0b',
     userRole: 'member', status: 'active', joinedAt: '2026-04-01',
+    phone: '13800000014', password: 'wuhongxu',
   },
   {
     id: 'm5', name: '肖文博', avatar: '/team-avatars.png',
     role: '机械臂训练', initials: 'XW', color: '#8b5cf6',
     userRole: 'member', status: 'active', joinedAt: '2026-03-01',
+    phone: '13800000015', password: 'xiaowenbo',
   },
   {
     id: 'm6', name: '刘世文', avatar: '/team-avatars.png',
     role: '产品经理', initials: 'LS', color: '#06b6d4',
     userRole: 'member', status: 'active', joinedAt: '2026-03-01',
+    phone: '13800000016', password: 'liushiwen',
   },
   {
     id: 'm7', name: '陈露佳', avatar: '/team-avatars.png',
     role: '算法工程师', initials: 'CL', color: '#e87940',
     userRole: 'member', status: 'active', joinedAt: '2026-04-15',
+    phone: '13800000017', password: 'chenlujia',
   },
   {
     id: 'm8', name: '张柯', avatar: '/team-avatars.png',
     role: '算法工程师', initials: 'ZK', color: '#ec4899',
     userRole: 'member', status: 'active', joinedAt: '2026-04-01',
+    phone: '13800000018', password: 'zhangke',
   },
   {
     id: 'm9', name: '小组协作', avatar: '/team-avatars.png',
     role: '团队协作', initials: 'XZ', color: '#6366f1',
     userRole: 'member', status: 'active', joinedAt: '2026-05-01',
+    phone: '13800000019', password: 'xiaozu',
   },
 ];
 

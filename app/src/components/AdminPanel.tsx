@@ -40,6 +40,8 @@ export default function AdminPanel() {
       userRole: 'member',
       status: 'active',
       joinedAt: new Date().toISOString().split('T')[0],
+      phone: '',
+      password: '',
     };
     setMembers((prev) => [...prev, newMember]);
     setFormName('');

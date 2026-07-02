@@ -8,6 +8,7 @@ import {
   teamMembers, projects, tasks, issues, getProjectColor,
 } from '@/data/mockData';
 import type { TeamMember } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
 import GitGraph from './GitGraph';
 import KanbanBoard from './KanbanBoard';
 import IssueTracker from './IssueTracker';
@@ -178,6 +179,9 @@ function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isAdmin = user?.userRole === 'admin';
+  const visibleItems = isAdmin ? sidebarItems : sidebarItems.filter((i) => i.id !== 'admin');
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -203,7 +207,7 @@ export default function Dashboard() {
             className="w-full flex items-center justify-end p-2 text-[#969699] hover:text-[#f4f4f5] transition-colors mb-2">
             {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
-          {sidebarItems.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

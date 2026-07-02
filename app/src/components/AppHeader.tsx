@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Search, Bell, Command } from 'lucide-react';
+import { Search, Bell, Command, LogOut } from 'lucide-react';
 import { teamMembers } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AppHeader() {
   const [searchFocused, setSearchFocused] = useState(false);
   const displayMembers = teamMembers.filter((m) => m.id !== 'm9'); // exclude 小组协作
+  const { user, logout } = useAuth();
 
   return (
     <header className="glass-header sticky top-0 z-50 h-16 flex items-center justify-between px-6">
@@ -57,6 +59,28 @@ export default function AppHeader() {
             </div>
           )}
         </div>
+        {user && (
+          <div className="flex items-center gap-2 pl-3 ml-1 border-l border-[#1f1f22]">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+              style={{ backgroundColor: user.color }}
+              title={user.name}
+            >
+              {user.initials}
+            </div>
+            <div className="hidden sm:block leading-tight">
+              <div className="text-xs font-medium text-[#f4f4f5]">{user.name}</div>
+              <div className="text-[10px] text-[#969699] font-mono">{user.userRole === 'admin' ? 'Admin' : '成员'}</div>
+            </div>
+            <button
+              onClick={logout}
+              className="p-1.5 rounded hover:bg-[#d7244b]/10 text-[#969699] hover:text-[#d7244b] transition-colors"
+              title="退出登录"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

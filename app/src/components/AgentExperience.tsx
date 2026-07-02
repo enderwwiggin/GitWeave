@@ -13,7 +13,8 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { agentExperiences as initialExperiences, agentTags } from '@/data/agentData';
-import { teamMembers, currentUserId, getMemberById } from '@/data/mockData';
+import { teamMembers, getMemberById } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
 import type { AgentExperience, AgentComment } from '@/types';
 
 export default function AgentExperience() {
@@ -31,7 +32,9 @@ export default function AgentExperience() {
   const [formTags, setFormTags] = useState<string[]>([]);
   const [formTagInput, setFormTagInput] = useState('');
 
-  const currentUser = getMemberById(currentUserId) ?? teamMembers[0];
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? 'm1';
+  const currentUser = user ? (getMemberById(user.id) ?? teamMembers[0]) : teamMembers[0];
 
   const filtered = useMemo(() => {
     return experiences.filter((exp) => {

@@ -1,9 +1,11 @@
-import { currentUserId, currentUserRole } from '@/data/mockData';
+import { useAuth } from '@/hooks/useAuth';
+import { currentUserId as fallbackUserId, currentUserRole as fallbackRole } from '@/data/mockData';
 import type { Permission } from '@/types';
 
 export function usePermission() {
-  const userId = currentUserId;
-  const userRole = currentUserRole;
+  const { user } = useAuth();
+  const userId = user?.id ?? fallbackUserId;
+  const userRole = user?.userRole ?? fallbackRole;
   const isAdmin = userRole === 'admin';
 
   function getTaskPermission(assigneeId: string, editors: string[]): Permission {
