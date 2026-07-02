@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 8% 2%;
+    --foreground: 240 6% 96%;
+    --card: 240 7% 7%;
+    --card-foreground: 240 6% 96%;
+    --popover: 240 7% 7%;
+    --popover-foreground: 240 6% 96%;
+    --primary: 217 80% 47%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 13%;
+    --secondary-foreground: 240 6% 96%;
+    --muted: 240 5% 13%;
+    --muted-foreground: 240 4% 58%;
+    --accent: 240 5% 13%;
+    --accent-foreground: 240 6% 96%;
+    --destructive: 350 78% 49%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 13%;
+    --input: 240 4% 13%;
+    --ring: 217 80% 47%;
+    --radius: 0.5rem;
+
+    --color-bg: #050507;
+    --color-card: #111113;
+    --color-text: #f4f4f5;
+    --color-muted: #969699;
+    --color-border: #1f1f22;
+    --color-blue: #1868d6;
+    --color-red: #d7244b;
+    --color-green: #10b981;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .glass-panel {
+    background: rgba(17, 17, 19, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-header {
+    background: rgba(5, 5, 7, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .stat-gradient {
+    background: linear-gradient(90deg, #d7244b -4%, #e0ccbb 56%, #1868d6 103%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .priority-badge {
+    @apply inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-medium;
+  }
+
+  .priority-p0 {
+    @apply bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  .priority-p1 {
+    @apply bg-orange-500/20 text-orange-400 border border-orange-500/30;
+  }
+
+  .priority-p2 {
+    @apply bg-blue-500/20 text-blue-400 border border-blue-500/30;
+  }
+
+  .priority-p3 {
+    @apply bg-gray-500/20 text-gray-400 border border-gray-500/30;
+  }
+
+  .status-todo {
+    @apply bg-red-500/10 text-red-400;
+  }
+
+  .status-in-progress {
+    @apply bg-blue-500/10 text-blue-400;
+  }
+
+  .status-done {
+    @apply bg-green-500/10 text-green-400;
+  }
+
+  .kanban-column {
+    min-height: 400px;
+    pointer-events: none;
+  }
+
+  .kanban-card {
+    pointer-events: auto;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .kanban-card.dragging {
+    opacity: 0.8;
+    transform: rotate(3deg) scale(1.02);
+  }
+
+  .kanban-column.drag-over {
+    background: rgba(24, 104, 214, 0.05);
+    border-color: rgba(24, 104, 214, 0.3);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #1f1f22;
+    border-radius: 2px;
+  }
+
+  .commit-node {
+    transition: all 0.3s ease;
+  }
+
+  .commit-node:hover {
+    transform: scale(1.2);
+    filter: drop-shadow(0 0 8px rgba(24, 104, 214, 0.6));
+  }
+
+  .branch-line {
+    stroke-dasharray: 4 4;
+    animation: dash 20s linear infinite;
+  }
+
+  @keyframes dash {
+    to {
+      stroke-dashoffset: -100;
+    }
+  }
+
+  .pulse-dot {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.5s ease forwards;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .rolling-number {
+    display: inline-flex;
+    gap: 2px;
+  }
+
+  .digit-roller-window {
+    display: inline-block;
+    height: 1em;
+    overflow: hidden;
+    line-height: 1em;
+  }
+
+  .digit-roller-track {
+    display: flex;
+    flex-direction: column;
+    transition: transform 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+  }
+
+  .digit {
+    height: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .issue-card {
+    transition: all 0.2s ease;
+  }
+
+  .issue-card:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

@@ -1,0 +1,5 @@
+.code-graph/
+gh_auth.log
+app/node_modules/
+app/dist/
+*.log
