@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { GitBranch, Phone, Lock, User, KeyRound, ArrowRight, Mail } from 'lucide-react';
+import { Phone, Lock, User, KeyRound, ArrowRight, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import Logo from './Logo';
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -52,9 +53,7 @@ export default function Login() {
         {/* Logo + 标题 */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
-            <div className="w-10 h-10 rounded-lg bg-[#1868d6]/20 flex items-center justify-center">
-              <GitBranch className="w-6 h-6 text-[#1868d6]" />
-            </div>
+            <Logo className="w-10 h-10" size={40} />
             <span className="text-2xl font-bold tracking-tight text-[#f4f4f5]">GitWeave</span>
           </div>
           <p className="text-sm text-[#969699] font-mono">团队代码管理与项目协作平台</p>

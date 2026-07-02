@@ -16,6 +16,7 @@ import AgentExperience from './AgentExperience';
 import TransferGraph from './TransferGraph';
 import CodeVersion from './CodeVersion';
 import AdminPanel from './AdminPanel';
+import TodoList from './TodoList';
 
 const sidebarItems = [
   { id: 'overview', label: '概览', icon: LayoutDashboard },
@@ -80,12 +81,15 @@ function TeamView() {
 }
 
 function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void }) {
-  const projectStats = projects.map((p) => ({
-    ...p,
-    taskCount: tasks.filter((t) => t.projectId === p.id).length,
-    doneCount: tasks.filter((t) => t.projectId === p.id && t.status === 'done').length,
-    issueCount: issues.filter((i) => i.projectId === p.id && i.status === 'open').length,
-  }));
+  // 只显示进行中（active）的项目
+  const projectStats = projects
+    .filter((p) => p.status === 'active')
+    .map((p) => ({
+      ...p,
+      taskCount: tasks.filter((t) => t.projectId === p.id).length,
+      doneCount: tasks.filter((t) => t.projectId === p.id && t.status === 'done').length,
+      issueCount: issues.filter((i) => i.projectId === p.id && i.status === 'open').length,
+    }));
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -136,7 +140,7 @@ function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void }) {
             </h3>
             <button onClick={() => onNavigate('board')} className="text-xs text-[#10b981] hover:underline">打开看板</button>
           </div>
-          <div className="h-[calc(100%-44px)] overflow-hidden p-4">
+          <div className="h-[calc(100%-44px)] overflow-y-auto scrollbar-thin p-4">
             <div className="space-y-2 mb-4">
               {projects.map((p) => {
                 const pt = tasks.filter((t) => t.projectId === p.id);
@@ -171,6 +175,7 @@ function OverviewView({ onNavigate }: { onNavigate: (tab: string) => void }) {
                 <div className="text-xs text-[#969699]">已完成</div>
               </div>
             </div>
+            <TodoList />
           </div>
         </div>
       </div>

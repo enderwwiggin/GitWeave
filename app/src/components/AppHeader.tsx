@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search, Bell, Command, LogOut } from 'lucide-react';
 import { teamMembers } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
+import Logo from './Logo';
 
 export default function AppHeader() {
   const [searchFocused, setSearchFocused] = useState(false);
@@ -11,7 +12,7 @@ export default function AppHeader() {
   return (
     <header className="glass-header sticky top-0 z-50 h-16 flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
-        <img src="/logo.png" alt="GitWeave" className="w-8 h-8" />
+        <Logo className="w-8 h-8" size={32} />
         <span className="text-lg font-semibold tracking-tight text-[#f4f4f5]">
           GitWeave
         </span>
