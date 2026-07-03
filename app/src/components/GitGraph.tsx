@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { projects, gitNodes, getProjectColor } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
-import { GitBranch, FolderKanban, Filter, Plus, X, GitCommit, Paperclip, Download, Trash2, Settings, Loader2, RefreshCw } from 'lucide-react';
+import { GitBranch, FolderKanban, Filter, Plus, X, GitCommit, Paperclip, Download, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import type { FileVersion } from '@/types';
-import { backendUrl, getAdminKey, saveBackendConfig, fetchCommits, createCommit, deleteCommit, fileToBase64, type AttachmentPayload } from '@/lib/backend';
+import { backendUrl, fetchCommits, createCommit, deleteCommit, fileToBase64, type AttachmentPayload } from '@/lib/backend';
 
 interface TooltipData {
   x: number;
@@ -38,7 +38,6 @@ export default function GitGraph() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const linesGroupRef = useRef<THREE.Group | null>(null);
 
@@ -50,9 +49,6 @@ export default function GitGraph() {
   const [fSize, setFSize] = useState('');
   const [fAttach, setFAttach] = useState<File | null>(null);
 
-  // 后端设置表单
-  const [sUrl, setSUrl] = useState(backendUrl());
-  const [sKey, setSKey] = useState(getAdminKey());
 
   // 后端模式：初次 / 刷新 / backendOn 变化时异步加载（demo 模式已在 init 时同步加载）
   useEffect(() => {
@@ -121,7 +117,7 @@ export default function GitGraph() {
       if (fAttach) {
         attachment = { name: fAttach.name, size: `${Math.max(1, Math.round(fAttach.size / 1024))}KB`, contentBase64: await fileToBase64(fAttach) };
       }
-      const saved = await createCommit(commit, attachment);
+      const saved = await createCommit(commit, { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' }, attachment);
       setCommits((prev) => [saved, ...prev]); // 乐观更新，避免写后读缓存陈旧
       resetForm();
       setShowModal(false);
@@ -138,30 +134,13 @@ export default function GitGraph() {
       return;
     }
     try {
-      await deleteCommit(id);
+      await deleteCommit(id, { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' });
       setCommits((prev) => prev.filter((c) => c.id !== id));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
 
-  const openCreate = () => {
-    if (backendOn && !getAdminKey()) {
-      setShowSettings(true);
-      return;
-    }
-    setShowModal(true);
-  };
-
-  const saveSettings = () => {
-    saveBackendConfig(sUrl, sKey);
-    setShowSettings(false);
-    if (sUrl.trim().length > 0) {
-      setRefreshKey((k) => k + 1);
-    } else {
-      setCommits(loadLocalCommits());
-    }
-  };
 
   // Three.js 3D 背景（装饰性，基于 gitNodes，与提交数据无关）
   useEffect(() => {
@@ -315,13 +294,7 @@ export default function GitGraph() {
               </button>
             )}
             {isAdmin && (
-              <button onClick={() => { setSUrl(backendUrl()); setSKey(getAdminKey()); setShowSettings(true); }} title="后端设置"
-                className="p-1 rounded-full bg-[#1f1f22] text-[#969699] hover:text-[#f4f4f5] transition-colors">
-                <Settings className="w-3 h-3" />
-              </button>
-            )}
-            {isAdmin && (
-              <button onClick={openCreate}
+              <button onClick={() => setShowModal(true)}
                 className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-medium bg-[#1868d6] hover:bg-[#1868d6]/80 text-white transition-colors">
                 <Plus className="w-3 h-3" />新建提交
               </button>
@@ -498,42 +471,6 @@ export default function GitGraph() {
                 className="flex-1 h-9 rounded bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 text-sm font-medium text-white transition-colors flex items-center justify-center gap-1">
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />提交中...</> : '提交'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 后端设置弹窗 —— 仅管理员 */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setShowSettings(false)}>
-          <div className="glass-panel rounded-xl w-full max-w-md p-5 fade-in-up" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-[#f4f4f5] flex items-center gap-2">
-                <Settings className="w-4 h-4 text-[#1868d6]" />后端设置
-              </h3>
-              <button onClick={() => setShowSettings(false)} className="text-[#969699] hover:text-[#f4f4f5]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-[#969699] mb-1 block">后端地址（Cloudflare Worker URL）</label>
-                <input type="text" value={sUrl} onChange={(e) => setSUrl(e.target.value)} placeholder="https://xxx.workers.dev"
-                  className="w-full h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50" />
-                <p className="text-[10px] text-[#969699] mt-1">留空则使用本地演示模式</p>
-              </div>
-              <div>
-                <label className="text-xs text-[#969699] mb-1 block">管理员口令</label>
-                <input type="password" value={sKey} onChange={(e) => setSKey(e.target.value)} placeholder="仅管理员填写，用于写入/删除"
-                  className="w-full h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50" />
-                <p className="text-[10px] text-[#969699] mt-1">口令仅保存在你本机浏览器，不会打包进应用</p>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowSettings(false)}
-                className="flex-1 h-9 rounded border border-[#1f1f22] text-sm text-[#969699] hover:text-[#f4f4f5] hover:border-[#969699]/40 transition-colors">取消</button>
-              <button onClick={saveSettings}
-                className="flex-1 h-9 rounded bg-[#1868d6] hover:bg-[#1868d6]/80 text-sm font-medium text-white transition-colors">保存</button>
             </div>
           </div>
         </div>

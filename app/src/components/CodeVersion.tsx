@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Upload,
   Download,
@@ -10,44 +10,99 @@ import {
   ChevronUp,
   FolderKanban,
   Filter,
+  Loader2,
+  Paperclip,
 } from 'lucide-react';
-import { fileVersions, projects, getProjectColor } from '@/data/mockData';
+import { projects, getProjectColor } from '@/data/mockData';
 import { usePermission } from '@/hooks/usePermission';
+import { useAuth } from '@/hooks/useAuth';
+import type { FileVersion } from '@/types';
+import { backendUrl, fetchCommits, createCommit, fileToBase64, type AttachmentPayload } from '@/lib/backend';
 
 export default function CodeVersion() {
   const { getCodePermission } = usePermission();
   const perm = getCodePermission();
+  const { user, users } = useAuth();
+  const isAdmin = user?.userRole === 'admin';
+
+  const [commits, setCommits] = useState<FileVersion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formFile, setFormFile] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formDiff, setFormDiff] = useState('');
   const [formProject, setFormProject] = useState('');
+  const [formAttach, setFormAttach] = useState<File | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const list = await fetchCommits();
+        if (!cancelled) setCommits(list);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
 
   const filtered = filterProject
-    ? fileVersions.filter((v) => v.projectId === filterProject)
-    : fileVersions;
+    ? commits.filter((v) => v.projectId === filterProject)
+    : commits;
 
   // Group by filename
   const grouped = filtered.reduce((acc, v) => {
     if (!acc[v.filename]) acc[v.filename] = [];
     acc[v.filename].push(v);
     return acc;
-  }, {} as Record<string, typeof fileVersions>);
+  }, {} as Record<string, FileVersion[]>);
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!formFile || !formDesc || !formProject) return;
-    const existing = fileVersions.filter((v) => v.filename === formFile && v.projectId === formProject);
-    const nextVer = `v${existing.length + 1}`;
+    const uploader = users.find((u) => u.id === user?.id) ?? users[0];
+    const history = commits.filter((c) => c.filename === formFile && c.projectId === formProject);
+    const parent = history[0] ?? null;
+    const commit: FileVersion = {
+      id: `cm-${Date.now()}`,
+      version: `v${history.length + 1}`,
+      filename: formFile,
+      projectId: formProject,
+      uploader,
+      description: formDesc,
+      diff: formDiff.trim() || formDesc,
+      timestamp: new Date().toLocaleString('sv').slice(0, 16),
+      size: formAttach ? `${Math.max(1, Math.round(formAttach.size / 1024))}KB` : '—',
+      hash: Array.from({ length: 7 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
+      parentId: parent ? parent.id : null,
+    };
 
-    // In real app this would be an API call
-    alert(`上传成功！版本号：${nextVer}\n文件：${formFile}\n描述：${formDesc}\n\n注意：普通成员只能上传，无权下载编辑。`);
-    setUploadForm(false);
-    setFormFile('');
-    setFormDesc('');
-    setFormDiff('');
-    setFormProject('');
+    setSubmitting(true);
+    setError(null);
+    try {
+      let attachment: AttachmentPayload | undefined;
+      if (formAttach) {
+        attachment = { name: formAttach.name, size: `${Math.max(1, Math.round(formAttach.size / 1024))}KB`, contentBase64: await fileToBase64(formAttach) };
+      }
+      const creds = { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' };
+      await createCommit(commit, creds, attachment);
+      setUploadForm(false);
+      setFormFile(''); setFormDesc(''); setFormDiff(''); setFormProject(''); setFormAttach(null);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -61,18 +116,24 @@ export default function CodeVersion() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setUploadForm(!uploadForm)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 text-white text-sm font-medium transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            上传新版本
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setUploadForm(!uploadForm)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 text-white text-sm font-medium transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              上传新版本
+            </button>
+          )}
         </div>
       </div>
 
+      {error && (
+        <div className="mb-3 px-3 py-2 rounded bg-[#d7244b]/10 border border-[#d7244b]/30 text-xs text-[#d7244b]">{error}</div>
+      )}
+
       {/* Upload Form */}
-      {uploadForm && (
+      {uploadForm && isAdmin && (
         <div className="glass-panel rounded-lg p-5 mb-4 fade-in-up">
           <h3 className="text-sm font-medium text-[#f4f4f5] mb-4">上传新版本</h3>
           <div className="grid grid-cols-2 gap-4">
@@ -114,20 +175,28 @@ export default function CodeVersion() {
               <textarea
                 value={formDiff}
                 onChange={(e) => setFormDiff(e.target.value)}
-                placeholder="+ 添加了什么\n- 移除了什么\n* 修改了什么"
+                placeholder="+ 添加了什么&#10;- 移除了什么&#10;* 修改了什么"
                 rows={4}
                 className="w-full px-3 py-2 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50 font-mono resize-none"
               />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-[#969699] mb-1.5 block flex items-center gap-1"><Paperclip className="w-3 h-3" />附件（可选，上传实际文件）</label>
+              <input
+                type="file"
+                onChange={(e) => setFormAttach(e.target.files?.[0] ?? null)}
+                className="w-full text-xs text-[#969699] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#1868d6]/20 file:text-[#1868d6] file:text-xs file:cursor-pointer hover:file:bg-[#1868d6]/30"
+              />
+              {formAttach && <p className="text-[10px] text-[#10b981] mt-1">已选择：{formAttach.name}（{Math.max(1, Math.round(formAttach.size / 1024))}KB）</p>}
             </div>
           </div>
           <div className="flex justify-end mt-4">
             <button
               onClick={handleUpload}
-              disabled={!formFile || !formDesc || !formProject}
+              disabled={!formFile || !formDesc || !formProject || submitting}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
             >
-              <Upload className="w-4 h-4" />
-              确认上传（自动递增版本号）
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />上传中...</> : <><Upload className="w-4 h-4" />确认上传（自动递增版本号）</>}
             </button>
           </div>
         </div>
@@ -160,7 +229,18 @@ export default function CodeVersion() {
 
       {/* Version Timeline */}
       <div className="flex-1 overflow-y-auto scrollbar-thin space-y-4">
-        {Object.entries(grouped).map(([filename, versions]) => (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Loader2 className="w-8 h-8 text-[#1868d6] animate-spin mb-3" />
+            <p className="text-sm text-[#969699]">加载中...</p>
+          </div>
+        ) : Object.keys(grouped).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <FileCode className="w-10 h-10 text-[#1f1f22] mb-3" />
+            <p className="text-sm text-[#969699]">暂无版本记录</p>
+            <p className="text-xs text-[#969699] mt-1">{isAdmin ? '点击「上传新版本」提交第一个文件' : '管理员上传后将在此显示'}</p>
+          </div>
+        ) : Object.entries(grouped).map(([filename, versions]) => (
           <div key={filename} className="glass-panel rounded-lg overflow-hidden">
             {/* File Header */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1f1f22]">
@@ -169,7 +249,6 @@ export default function CodeVersion() {
               <span className="text-xs font-mono text-[#969699] bg-[#1f1f22] px-2 py-0.5 rounded-full">
                 {versions.length} 版本
               </span>
-
             </div>
 
             {/* Version List */}
@@ -223,23 +302,24 @@ export default function CodeVersion() {
                         <span className="font-mono">{v.size}</span>
                         <span className="font-mono text-[#969699]">{v.hash}</span>
 
-                        {/* Download button - Admin only */}
-                        {perm.canDownloadCode && (
-                          <button
+                        {/* Download attachment - 有附件且有下载权限 */}
+                        {v.attachment && perm.canDownloadCode && (
+                          <a
+                            href={`${backendUrl()}/api/${v.attachment.path}`}
+                            target="_blank"
+                            rel="noreferrer"
                             className="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              alert(`下载 ${v.filename} ${v.version}`);
-                            }}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <Download className="w-3 h-3" />
-                            下载
-                          </button>
+                            {v.attachment.name}
+                          </a>
                         )}
-                        {!perm.canDownloadCode && (
-                          <span className="ml-auto text-[10px] text-[#969699]">
-                            只读
-                          </span>
+                        {v.attachment && !perm.canDownloadCode && (
+                          <span className="ml-auto flex items-center gap-1 text-[10px] text-[#969699]"><Paperclip className="w-3 h-3" />{v.attachment.name}（只读）</span>
+                        )}
+                        {!v.attachment && (
+                          <span className="ml-auto text-[10px] text-[#969699]">无附件</span>
                         )}
                       </div>
 

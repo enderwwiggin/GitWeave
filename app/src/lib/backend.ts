@@ -1,13 +1,11 @@
 import type { FileVersion } from '@/types';
 
 // 后端代理（Cloudflare Worker）客户端
-// 令牌在 Worker 服务端，前端只跟 Worker 通信。
+// 令牌在 Worker 服务端。写入需带登录账号密码，Worker 校验是否管理员。
 
 const URL_KEY = 'gitweave_backend_url';
-const ADMIN_KEY = 'gitweave_admin_key';
 
-// 部署 Worker 后把 URL 填在这里作为团队默认值（员工无需手动配置即可读取）。
-// 为空时前端回退到 localStorage 演示模式。
+// 已部署的团队后端地址（员工无需配置即可读取）。为空则回退 localStorage 演示模式。
 const BAKED_BACKEND_URL = 'https://gitweave-backend.2429910092.workers.dev';
 
 export function backendUrl(): string {
@@ -15,13 +13,16 @@ export function backendUrl(): string {
   return v.replace(/\/+$/, '');
 }
 
-export function getAdminKey(): string {
-  return localStorage.getItem(ADMIN_KEY) || '';
+export interface AuthCreds {
+  name: string;
+  password: string;
 }
 
-export function saveBackendConfig(url: string, adminKey: string): void {
-  localStorage.setItem(URL_KEY, url.trim());
-  localStorage.setItem(ADMIN_KEY, adminKey);
+function authHeaders(creds: AuthCreds): Record<string, string> {
+  return {
+    'X-Auth-User': encodeURIComponent(creds.name),
+    'X-Auth-Pass': encodeURIComponent(creds.password),
+  };
 }
 
 export async function fetchCommits(): Promise<FileVersion[]> {
@@ -37,10 +38,10 @@ export interface AttachmentPayload {
   contentBase64: string;
 }
 
-export async function createCommit(commit: FileVersion, attachment?: AttachmentPayload): Promise<FileVersion> {
+export async function createCommit(commit: FileVersion, creds: AuthCreds, attachment?: AttachmentPayload): Promise<FileVersion> {
   const res = await fetch(`${backendUrl()}/api/commits`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': getAdminKey() },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(creds) },
     body: JSON.stringify({ commit, attachment }),
   });
   const data = await res.json().catch(() => ({}));
@@ -48,10 +49,10 @@ export async function createCommit(commit: FileVersion, attachment?: AttachmentP
   return data.commit as FileVersion;
 }
 
-export async function deleteCommit(id: string): Promise<void> {
+export async function deleteCommit(id: string, creds: AuthCreds): Promise<void> {
   const res = await fetch(`${backendUrl()}/api/commits/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Key': getAdminKey() },
+    headers: authHeaders(creds),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

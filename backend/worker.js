@@ -21,7 +21,7 @@ function cors(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOW_ORIGIN || '*',
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Key',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-User, X-Auth-Pass',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -31,6 +31,20 @@ function json(data, env, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors(env) },
   });
+}
+
+// 校验请求是否来自管理员：比对登录账号密码与 ADMIN_USERS（name->password）
+// 名称/密码可能含中文或特殊字符，前端用 encodeURIComponent 编码，这里解码
+function isAdmin(env, request) {
+  let users;
+  try {
+    users = JSON.parse(env.ADMIN_USERS || '{}');
+  } catch {
+    users = {};
+  }
+  const name = decodeURIComponent(request.headers.get('X-Auth-User') || '');
+  const pass = decodeURIComponent(request.headers.get('X-Auth-Pass') || '');
+  return !!name && users[name] === pass;
 }
 
 // UTF-8 安全的 base64（提交说明含中文）
@@ -103,8 +117,8 @@ export default {
 
       // 新建提交（管理员）
       if (pathname === '/api/commits' && request.method === 'POST') {
-        if (request.headers.get('X-Admin-Key') !== env.ADMIN_PASSPHRASE) {
-          return json({ error: '无权限：仅管理员可新建提交' }, env, 401);
+        if (!isAdmin(env, request)) {
+          return json({ error: '无权限：请用管理员账号登录后再提交' }, env, 401);
         }
         const payload = await request.json();
         const commit = payload.commit;
@@ -126,7 +140,7 @@ export default {
 
       // 删除提交（管理员）
       if (pathname.startsWith('/api/commits/') && request.method === 'DELETE') {
-        if (request.headers.get('X-Admin-Key') !== env.ADMIN_PASSPHRASE) {
+        if (!isAdmin(env, request)) {
           return json({ error: '无权限：仅管理员可删除提交' }, env, 401);
         }
         const id = decodeURIComponent(pathname.split('/').pop());
