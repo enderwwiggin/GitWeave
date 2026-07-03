@@ -8,7 +8,7 @@ const ADMIN_KEY = 'gitweave_admin_key';
 
 // 部署 Worker 后把 URL 填在这里作为团队默认值（员工无需手动配置即可读取）。
 // 为空时前端回退到 localStorage 演示模式。
-const BAKED_BACKEND_URL = '';
+const BAKED_BACKEND_URL = 'https://gitweave-backend.2429910092.workers.dev';
 
 export function backendUrl(): string {
   const v = (localStorage.getItem(URL_KEY) || BAKED_BACKEND_URL).trim();
