@@ -72,14 +72,8 @@ export const teamMembers: TeamMember[] = [
     userRole: 'member', status: 'active', joinedAt: '2026-04-01',
     phone: '13800000018', password: 'zhangke',
   },
-  {
-    id: 'm9', name: '小组协作', avatar: '/team-avatars.png',
-    role: '团队协作', initials: 'XZ', color: '#6366f1',
-    userRole: 'member', status: 'active', joinedAt: '2026-05-01',
-    phone: '13800000019', password: 'xiaozu',
-  },
-];
 
+];
 // 只返回 active 的成员
 export const activeMembers = teamMembers.filter((m) => m.status === 'active');
 export const adminMembers = teamMembers.filter((m) => m.userRole === 'admin');
@@ -302,10 +296,10 @@ export const tasks: Task[] = [
     id: 't16', projectId: 'p6', title: 'AlohaMini机器人研究',
     description: '陈润峰、肖文博、武鸿旭、刘世文共同研究AlohaMini机器人方案',
     status: 'in-progress', priority: 'P0', branch: 'research/alohamini',
-    assignee: teamMembers[10], createdAt: '2026-06-25', updatedAt: '2026-06-30',
+    assignee: teamMembers[9], createdAt: '2026-06-25', updatedAt: '2026-06-30',
     tags: ['AlohaMini', '研究'],
     transferHistory: [
-      { id: 'th16', from: null, to: teamMembers[10], timestamp: '2026-06-25 09:00', reason: '小组任务创建' },
+      { id: 'th16', from: null, to: teamMembers[9], timestamp: '2026-06-25 09:00', reason: '小组任务创建' },
     ],
     editors: ['m1', 'm5', 'm4', 'm6'],
     viewers: ['m1', 'm5', 'm4', 'm6'],
@@ -314,10 +308,10 @@ export const tasks: Task[] = [
     id: 't17', projectId: 'p6', title: '语音交互方案先行',
     description: 'AlohaMini项目先做语音交互方案，作为人机交互入口',
     status: 'in-progress', priority: 'P0', branch: 'feat/voice-interaction',
-    assignee: teamMembers[10], createdAt: '2026-06-26', updatedAt: '2026-06-30',
+    assignee: teamMembers[9], createdAt: '2026-06-26', updatedAt: '2026-06-30',
     tags: ['AlohaMini', '语音'],
     transferHistory: [
-      { id: 'th17', from: null, to: teamMembers[10], timestamp: '2026-06-26 09:00', reason: '任务创建' },
+      { id: 'th17', from: null, to: teamMembers[9], timestamp: '2026-06-26 09:00', reason: '任务创建' },
     ],
     editors: ['m1', 'm5', 'm4', 'm6'],
     viewers: ['m1', 'm5', 'm4', 'm6'],
@@ -404,10 +398,10 @@ export const tasks: Task[] = [
     id: 't25', projectId: 'p4', title: '采集推理跨机械臂复现',
     description: '将采集推理pipeline在不同机械臂平台上复现，验证通用性',
     status: 'in-progress', priority: 'P0', branch: 'feat/deploy-multi-arm',
-    assignee: teamMembers[10], createdAt: '2026-06-23', updatedAt: '2026-06-30',
+    assignee: teamMembers[9], createdAt: '2026-06-23', updatedAt: '2026-06-30',
     tags: ['机械臂', '复现'],
     transferHistory: [
-      { id: 'th25', from: null, to: teamMembers[10], timestamp: '2026-06-23 09:00', reason: '任务创建' },
+      { id: 'th25', from: null, to: teamMembers[9], timestamp: '2026-06-23 09:00', reason: '任务创建' },
     ],
     editors: ['m8'], viewers: ['m5', 'm8'],
   },
@@ -415,10 +409,10 @@ export const tasks: Task[] = [
     id: 't26', projectId: 'p6', title: 'AlohaMini方案搭建',
     description: '搭建AlohaMini机器人的整体方案，硬件选型和软件架构',
     status: 'in-progress', priority: 'P0', branch: 'feat/alohamini-setup',
-    assignee: teamMembers[10], createdAt: '2026-06-25', updatedAt: '2026-06-30',
+    assignee: teamMembers[9], createdAt: '2026-06-25', updatedAt: '2026-06-30',
     tags: ['AlohaMini', '方案'],
     transferHistory: [
-      { id: 'th26', from: null, to: teamMembers[10], timestamp: '2026-06-25 09:00', reason: '任务创建' },
+      { id: 'th26', from: null, to: teamMembers[9], timestamp: '2026-06-25 09:00', reason: '任务创建' },
     ],
     editors: ['m8'], viewers: ['m8'],
   },
@@ -443,11 +437,11 @@ export const issues: Issue[] = [
     id: 'i2', projectId: 'p4', title: 'Piper机械臂通信延迟',
     description: 'Piper机械臂在训练过程中出现200ms+的通信延迟，影响策略收敛',
     solution: '优化ROS通信参数，升级到实时内核，调整控制频率',
-    status: 'open', priority: 'P0', reporter: teamMembers[6], assignee: teamMembers[10],
+    status: 'open', priority: 'P0', reporter: teamMembers[6], assignee: teamMembers[9],
     createdAt: '2026-06-28',
     tags: ['Piper', '延迟'],
     transferHistory: [
-      { id: 'ith2', from: null, to: teamMembers[10], timestamp: '2026-06-28 10:00', reason: '问题上报' },
+      { id: 'ith2', from: null, to: teamMembers[9], timestamp: '2026-06-28 10:00', reason: '问题上报' },
     ],
   },
   {
@@ -547,7 +541,7 @@ export const fileVersions: FileVersion[] = [
   },
   {
     id: 'fv8', version: 'v2', filename: 'rebot_train.py',
-    projectId: 'p4', uploader: teamMembers[10],
+    projectId: 'p4', uploader: teamMembers[9],
     description: '支持多机械臂平台',
     diff: '+ 抽象硬件接口层\n+ REBOT/Piper统一控制\n+ 配置化平台切换',
     timestamp: '2026-06-23 14:00', size: '45KB', hash: 'c2d3e4f',
@@ -555,7 +549,7 @@ export const fileVersions: FileVersion[] = [
   },
   {
     id: 'fv9', version: 'v3', filename: 'rebot_train.py',
-    projectId: 'p4', uploader: teamMembers[10],
+    projectId: 'p4', uploader: teamMembers[9],
     description: '添加数据增强策略',
     diff: '+ 时域抖动增强\n+ 空间扰动增强\n+ 成功率提升15%',
     timestamp: '2026-06-27 09:30', size: '52KB', hash: 'g5h6i7j',
