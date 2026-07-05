@@ -38,11 +38,18 @@ export interface AttachmentPayload {
   contentBase64: string;
 }
 
-export async function createCommit(commit: FileVersion, creds: AuthCreds, attachment?: AttachmentPayload): Promise<FileVersion> {
+// 整个项目文件夹中的单个文件
+export interface FolderFilePayload {
+  relativePath: string; // 相对文件夹根的路径，如 "src/main.py"
+  size: string;
+  contentBase64: string;
+}
+
+export async function createCommit(commit: FileVersion, creds: AuthCreds, files?: FolderFilePayload[]): Promise<FileVersion> {
   const res = await fetch(`${backendUrl()}/api/commits`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(creds) },
-    body: JSON.stringify({ commit, attachment }),
+    body: JSON.stringify({ commit, files }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `提交失败: ${res.status}`);
@@ -103,4 +110,34 @@ export function fileToBase64(file: File): Promise<string> {
   reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'));
   reader.readAsDataURL(file);
   return promise;
+}
+
+// 压缩文件扩展名（禁止上传）
+export const COMPRESSED_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tgz', '.tar.gz', '.tar.bz2', '.cab', '.iso', '.lz', '.lzma', '.z'];
+
+export function isCompressedFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return COMPRESSED_EXTS.some((ext) => lower.endsWith(ext));
+}
+
+// 读取整个文件夹（webkitdirectory 选择）为 FolderFilePayload 数组
+// 返回 { files, error }：若含压缩文件则返回 error，files 为空
+export async function readFolderFiles(fileList: FileList | File[]): Promise<{ files: FolderFilePayload[]; error?: string }> {
+  const arr = Array.from(fileList);
+  // 校验：禁止压缩文件
+  const compressed = arr.find((f) => isCompressedFile(f.name));
+  if (compressed) {
+    return { files: [], error: `禁止上传压缩文件：${compressed.name}。请上传解压后的整个项目文件夹。` };
+  }
+  const files: FolderFilePayload[] = [];
+  for (const f of arr) {
+    // webkitRelativePath 形如 "项目文件夹/src/main.py"，去掉首层文件夹名保留内部结构
+    const rel = (f.webkitRelativePath || f.name).split('/').slice(1).join('/') || f.name;
+    files.push({
+      relativePath: rel,
+      size: `${Math.max(1, Math.round(f.size / 1024))}KB`,
+      contentBase64: await fileToBase64(f),
+    });
+  }
+  return { files };
 }

@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { gitNodes, getProjectColor } from '@/data/mockData';
 import { useAuth } from '@/hooks/useAuth';
-import { GitBranch, FolderKanban, Filter, Plus, X, GitCommit, Paperclip, Download, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { GitBranch, FolderKanban, Filter, Plus, X, GitCommit, FolderOpen, Download, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import type { FileVersion } from '@/types';
-import { backendUrl, fetchCommits, createCommit, deleteCommit, fileToBase64, type AttachmentPayload } from '@/lib/backend';
+import { backendUrl, fetchCommits, createCommit, deleteCommit, readFolderFiles, type FolderFilePayload } from '@/lib/backend';
 import { useProjects } from '@/hooks/useProjects';
 
 interface TooltipData {
@@ -43,13 +43,15 @@ export default function GitGraph() {
   const [submitting, setSubmitting] = useState(false);
   const linesGroupRef = useRef<THREE.Group | null>(null);
 
-  // 新建提交表单
+  // 新建提交表单（整个项目文件夹）
   const [fProject, setFProject] = useState('');
-  const [fFile, setFFile] = useState('');
+  const [fFolderName, setFFolderName] = useState(''); // 项目文件夹名称（自动从所选文件夹提取）
   const [fMessage, setFMessage] = useState('');
   const [fDiff, setFDiff] = useState('');
-  const [fSize, setFSize] = useState('');
-  const [fAttach, setFAttach] = useState<File | null>(null);
+  const [fFiles, setFFiles] = useState<FolderFilePayload[]>([]);
+  const [fFileCount, setFFileCount] = useState(0);
+  const [fTotalKB, setFTotalKB] = useState(0);
+  const [fReading, setFReading] = useState(false);
 
 
   // 后端模式：初次 / 刷新 / backendOn 变化时异步加载（demo 模式已在 init 时同步加载）
@@ -83,27 +85,48 @@ export default function GitGraph() {
   }, [filterProject, commits]);
 
   const resetForm = () => {
-    setFProject(''); setFFile(''); setFMessage(''); setFDiff(''); setFSize(''); setFAttach(null);
+    setFProject(''); setFFolderName(''); setFMessage(''); setFDiff('');
+    setFFiles([]); setFFileCount(0); setFTotalKB(0); setFReading(false);
+  };
+
+  const handleFolderSelect = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setError(null);
+    setFReading(true);
+    try {
+      // 从第一个文件的相对路径提取文件夹名
+      const first = fileList[0];
+      const folderName = (first.webkitRelativePath || first.name).split('/')[0] || '项目文件夹';
+      const { files, error: readErr } = await readFolderFiles(fileList);
+      if (readErr) { setError(readErr); setFFiles([]); setFFileCount(0); setFTotalKB(0); setFFolderName(''); return; }
+      const totalKB = Array.from(fileList).reduce((s, f) => s + f.size, 0) / 1024;
+      setFFolderName(folderName);
+      setFFiles(files);
+      setFFileCount(files.length);
+      setFTotalKB(Math.round(totalKB));
+    } finally {
+      setFReading(false);
+    }
   };
 
   const handleCreate = async () => {
-    if (!fProject || !fFile.trim()) return;
+    if (!fProject || fFiles.length === 0) return;
     const uploader = users.find((u) => u.id === user?.id) ?? users[0];
-    const history = commits.filter((c) => c.projectId === fProject && c.filename === fFile.trim());
+    const history = commits.filter((c) => c.projectId === fProject && c.filename === fFolderName);
     const parent = history[0] ?? null;
     const proj = projects.find((p) => p.id === fProject);
     const commit: FileVersion = {
       id: `cm-${Date.now()}`,
       version: `v0.0.${history.length + 1}`,
-      filename: fFile.trim(),
+      filename: fFolderName,
       projectId: fProject,
       projectName: proj?.name,
       projectDescription: proj?.description,
       uploader,
-      description: fMessage.trim() || '文件提交',
-      diff: fDiff.trim() || (fMessage.trim() || '文件提交'),
+      description: fMessage.trim() || '文件夹提交',
+      diff: fDiff.trim() || (fMessage.trim() || '文件夹提交'),
       timestamp: new Date().toLocaleString('sv').slice(0, 16),
-      size: fSize.trim() || '—',
+      size: fTotalKB >= 1024 ? `${(fTotalKB / 1024).toFixed(1)}MB` : `${fTotalKB}KB`,
       hash: Array.from({ length: 7 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
       parentId: parent ? parent.id : null,
     };
@@ -118,11 +141,7 @@ export default function GitGraph() {
     setSubmitting(true);
     setError(null);
     try {
-      let attachment: AttachmentPayload | undefined;
-      if (fAttach) {
-        attachment = { name: fAttach.name, size: `${Math.max(1, Math.round(fAttach.size / 1024))}KB`, contentBase64: await fileToBase64(fAttach) };
-      }
-      const saved = await createCommit(commit, { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' }, attachment);
+      const saved = await createCommit(commit, { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' }, fFiles);
       setCommits((prev) => [saved, ...prev]); // 乐观更新，避免写后读缓存陈旧
       resetForm();
       setShowModal(false);
@@ -370,11 +389,18 @@ export default function GitGraph() {
                         <span className="inline-flex items-center gap-1 text-xs font-mono text-[#969699] bg-[#1f1f22] px-1.5 py-0.5 rounded">
                           <GitBranch className="w-3 h-3" />{version.filename}
                         </span>
-                        {version.attachment && (
-                          <a href={`${backendUrl()}/api/${version.attachment.path}`} target="_blank" rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-mono text-[#1868d6] bg-[#1868d6]/10 px-1.5 py-0.5 rounded hover:bg-[#1868d6]/20 transition-colors">
-                            <Download className="w-3 h-3" />{version.attachment.name}
-                          </a>
+                        {version.attachments && version.attachments.length > 0 && (
+                          <>
+                            <span className="inline-flex items-center gap-1 text-xs font-mono text-[#10b981] bg-[#10b981]/10 px-1.5 py-0.5 rounded">
+                              <FolderOpen className="w-3 h-3" />{version.attachments.length} 个文件
+                            </span>
+                            {version.attachments.map((att) => (
+                              <a key={att.path} href={`${backendUrl()}/api/${att.path}`} target="_blank" rel="noreferrer" title={att.name}
+                                className="inline-flex items-center gap-1 text-xs font-mono text-[#1868d6] bg-[#1868d6]/10 px-1.5 py-0.5 rounded hover:bg-[#1868d6]/20 transition-colors max-w-[180px] truncate">
+                                <Download className="w-3 h-3 shrink-0" /><span className="truncate">{att.name}</span>
+                              </a>
+                            ))}
+                          </>
                         )}
                       </div>
                     </div>
@@ -449,9 +475,23 @@ export default function GitGraph() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-[#969699] mb-1 block">文件名 *</label>
-                <input type="text" value={fFile} onChange={(e) => setFFile(e.target.value)} placeholder="如 main.py"
-                  className="w-full h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50" />
+                <label className="text-xs text-[#969699] mb-1 block flex items-center gap-1"><FolderOpen className="w-3 h-3" />项目文件夹 *（上传整个文件夹，禁止压缩包）</label>
+                <input
+                  type="file"
+                  /* @ts-expect-error 非标准属性，用于选择整个文件夹 */
+                  webkitdirectory=""
+                  directory=""
+                  multiple
+                  onChange={(e) => handleFolderSelect(e.target.files)}
+                  className="w-full text-xs text-[#969699] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#1868d6]/20 file:text-[#1868d6] file:text-xs file:cursor-pointer hover:file:bg-[#1868d6]/30"
+                />
+                {fReading && <p className="text-[10px] text-[#1868d6] mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />正在读取文件夹...</p>}
+                {!fReading && fFileCount > 0 && (
+                  <p className="text-[10px] text-[#10b981] mt-1">
+                    已选择文件夹「{fFolderName}」：{fFileCount} 个文件，共 {fTotalKB >= 1024 ? `${(fTotalKB / 1024).toFixed(1)}MB` : `${fTotalKB}KB`}
+                  </p>
+                )}
+                {!backendOn && <p className="text-[10px] text-[#d7244b] mt-1">本地模式不支持上传，请先配置后端</p>}
               </div>
               <div>
                 <label className="text-xs text-[#969699] mb-1 block">提交说明（可选）</label>
@@ -463,19 +503,12 @@ export default function GitGraph() {
                 <textarea value={fDiff} onChange={(e) => setFDiff(e.target.value)} rows={2} placeholder="可将 Agent 跑完后的变更报告粘贴至此..."
                   className="w-full px-3 py-2 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50 resize-none font-mono" />
               </div>
-              <div>
-                <label className="text-xs text-[#969699] mb-1 block flex items-center gap-1"><Paperclip className="w-3 h-3" />附件（可选）</label>
-                <input type="file" onChange={(e) => setFAttach(e.target.files?.[0] ?? null)}
-                  className="w-full text-xs text-[#969699] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#1868d6]/20 file:text-[#1868d6] file:text-xs file:cursor-pointer hover:file:bg-[#1868d6]/30" />
-                {fAttach && <p className="text-[10px] text-[#10b981] mt-1">已选择：{fAttach.name}（{Math.max(1, Math.round(fAttach.size / 1024))}KB）</p>}
-                {!backendOn && <p className="text-[10px] text-[#d7244b] mt-1">本地模式不支持附件，请先配置后端</p>}
-              </div>
             </div>
 
             <div className="flex gap-2 mt-5">
               <button onClick={() => setShowModal(false)} disabled={submitting}
                 className="flex-1 h-9 rounded border border-[#1f1f22] text-sm text-[#969699] hover:text-[#f4f4f5] hover:border-[#969699]/40 transition-colors disabled:opacity-40">取消</button>
-              <button onClick={handleCreate} disabled={!fProject || !fFile.trim() || submitting}
+              <button onClick={handleCreate} disabled={!fProject || fFiles.length === 0 || fReading || submitting}
                 className="flex-1 h-9 rounded bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 text-sm font-medium text-white transition-colors flex items-center justify-center gap-1">
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />提交中...</> : '提交'}
               </button>

@@ -11,13 +11,13 @@ import {
   FolderKanban,
   Filter,
   Loader2,
-  Paperclip,
+  FolderOpen,
 } from 'lucide-react';
 import { getProjectColor } from '@/data/mockData';
 import { usePermission } from '@/hooks/usePermission';
 import { useAuth } from '@/hooks/useAuth';
 import type { FileVersion } from '@/types';
-import { backendUrl, fetchCommits, createCommit, fileToBase64, type AttachmentPayload } from '@/lib/backend';
+import { backendUrl, fetchCommits, createCommit, readFolderFiles, type FolderFilePayload } from '@/lib/backend';
 import { useProjects } from '@/hooks/useProjects';
 
 export default function CodeVersion() {
@@ -35,11 +35,14 @@ export default function CodeVersion() {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formFile, setFormFile] = useState('');
+  const [formFolderName, setFormFolderName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formDiff, setFormDiff] = useState('');
   const [formProject, setFormProject] = useState('');
-  const [formAttach, setFormAttach] = useState<File | null>(null);
+  const [formFiles, setFormFiles] = useState<FolderFilePayload[]>([]);
+  const [formFileCount, setFormFileCount] = useState(0);
+  const [formTotalKB, setFormTotalKB] = useState(0);
+  const [formReading, setFormReading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,24 +72,43 @@ export default function CodeVersion() {
     return acc;
   }, {} as Record<string, FileVersion[]>);
 
+  const handleFolderSelect = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setError(null);
+    setFormReading(true);
+    try {
+      const first = fileList[0];
+      const folderName = (first.webkitRelativePath || first.name).split('/')[0] || '项目文件夹';
+      const { files, error: readErr } = await readFolderFiles(fileList);
+      if (readErr) { setError(readErr); setFormFiles([]); setFormFileCount(0); setFormTotalKB(0); setFormFolderName(''); return; }
+      const totalKB = Array.from(fileList).reduce((s, f) => s + f.size, 0) / 1024;
+      setFormFolderName(folderName);
+      setFormFiles(files);
+      setFormFileCount(files.length);
+      setFormTotalKB(Math.round(totalKB));
+    } finally {
+      setFormReading(false);
+    }
+  };
+
   const handleUpload = async () => {
-    if (!formFile || !formProject) return;
+    if (formFiles.length === 0 || !formProject) return;
     const uploader = users.find((u) => u.id === user?.id) ?? users[0];
-    const history = commits.filter((c) => c.filename === formFile && c.projectId === formProject);
+    const history = commits.filter((c) => c.filename === formFolderName && c.projectId === formProject);
     const parent = history[0] ?? null;
     const proj = projects.find((p) => p.id === formProject);
     const commit: FileVersion = {
       id: `cm-${Date.now()}`,
       version: `v0.0.${history.length + 1}`,
-      filename: formFile,
+      filename: formFolderName,
       projectId: formProject,
       projectName: proj?.name,
       projectDescription: proj?.description,
       uploader,
-      description: formDesc.trim() || '文件提交',
-      diff: formDiff.trim() || (formDesc.trim() || '文件提交'),
+      description: formDesc.trim() || '文件夹提交',
+      diff: formDiff.trim() || (formDesc.trim() || '文件夹提交'),
       timestamp: new Date().toLocaleString('sv').slice(0, 16),
-      size: formAttach ? `${Math.max(1, Math.round(formAttach.size / 1024))}KB` : '—',
+      size: formTotalKB >= 1024 ? `${(formTotalKB / 1024).toFixed(1)}MB` : `${formTotalKB}KB`,
       hash: Array.from({ length: 7 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
       parentId: parent ? parent.id : null,
     };
@@ -94,15 +116,12 @@ export default function CodeVersion() {
     setSubmitting(true);
     setError(null);
     try {
-      let attachment: AttachmentPayload | undefined;
-      if (formAttach) {
-        attachment = { name: formAttach.name, size: `${Math.max(1, Math.round(formAttach.size / 1024))}KB`, contentBase64: await fileToBase64(formAttach) };
-      }
       const creds = { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' };
-      const saved = await createCommit(commit, creds, attachment);
+      const saved = await createCommit(commit, creds, formFiles);
       setCommits((prev) => [saved, ...prev]); // 用后端返回的版本号/附件路径覆盖本地
       setUploadForm(false);
-      setFormFile(''); setFormDesc(''); setFormDiff(''); setFormProject(''); setFormAttach(null);
+      setFormFolderName(''); setFormDesc(''); setFormDiff(''); setFormProject('');
+      setFormFiles([]); setFormFileCount(0); setFormTotalKB(0);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -143,17 +162,7 @@ export default function CodeVersion() {
           <h3 className="text-sm font-medium text-[#f4f4f5] mb-4">上传新版本</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-[#969699] mb-1.5 block">文件名</label>
-              <input
-                type="text"
-                value={formFile}
-                onChange={(e) => setFormFile(e.target.value)}
-                placeholder="例如: umi3d_control.py"
-                className="w-full h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[#969699] mb-1.5 block">所属项目</label>
+              <label className="text-xs text-[#969699] mb-1.5 block">所属项目 *</label>
               <select
                 value={formProject}
                 onChange={(e) => setFormProject(e.target.value)}
@@ -165,6 +174,26 @@ export default function CodeVersion() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs text-[#969699] mb-1.5 block flex items-center gap-1"><FolderOpen className="w-3 h-3" />项目文件夹 *</label>
+              <input
+                type="file"
+                /* @ts-expect-error 非标准属性，用于选择整个文件夹 */
+                webkitdirectory=""
+                directory=""
+                multiple
+                onChange={(e) => handleFolderSelect(e.target.files)}
+                className="w-full text-xs text-[#969699] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#1868d6]/20 file:text-[#1868d6] file:text-xs file:cursor-pointer hover:file:bg-[#1868d6]/30"
+              />
+            </div>
+            <div className="col-span-2">
+              {formReading && <p className="text-[10px] text-[#1868d6] flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />正在读取文件夹...</p>}
+              {!formReading && formFileCount > 0 && (
+                <p className="text-[10px] text-[#10b981]">
+                  已选择文件夹「{formFolderName}」：{formFileCount} 个文件，共 {formTotalKB >= 1024 ? `${(formTotalKB / 1024).toFixed(1)}MB` : `${formTotalKB}KB`}（禁止上传压缩包）
+                </p>
+              )}
+            </div>
             <div className="col-span-2">
               <label className="text-xs text-[#969699] mb-1.5 block">提交说明（可选）</label>
               <input type="text"
@@ -175,7 +204,7 @@ export default function CodeVersion() {
               />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-[#969699] mb-1.5 block">变更内容 (Diff)</label>
+              <label className="text-xs text-[#969699] mb-1.5 block">变更内容 (Diff，可选)</label>
               <textarea
                 value={formDiff}
                 onChange={(e) => setFormDiff(e.target.value)}
@@ -184,20 +213,11 @@ export default function CodeVersion() {
                 className="w-full px-3 py-2 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50 font-mono resize-none"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs text-[#969699] mb-1.5 block flex items-center gap-1"><Paperclip className="w-3 h-3" />附件（可选，上传实际文件）</label>
-              <input
-                type="file"
-                onChange={(e) => setFormAttach(e.target.files?.[0] ?? null)}
-                className="w-full text-xs text-[#969699] file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-[#1868d6]/20 file:text-[#1868d6] file:text-xs file:cursor-pointer hover:file:bg-[#1868d6]/30"
-              />
-              {formAttach && <p className="text-[10px] text-[#10b981] mt-1">已选择：{formAttach.name}（{Math.max(1, Math.round(formAttach.size / 1024))}KB）</p>}
-            </div>
           </div>
           <div className="flex justify-end mt-4">
             <button
               onClick={handleUpload}
-              disabled={!formFile || !formProject || submitting}
+              disabled={formFiles.length === 0 || !formProject || formReading || submitting}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
             >
               {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />上传中...</> : <><Upload className="w-4 h-4" />确认上传（自动递增版本号）</>}
@@ -295,24 +315,13 @@ export default function CodeVersion() {
                         <span className="font-mono">{v.size}</span>
                         <span className="font-mono text-[#969699]">{v.hash}</span>
 
-                        {/* Download attachment - 有附件且有下载权限 */}
-                        {v.attachment && perm.canDownloadCode && (
-                          <a
-                            href={`${backendUrl()}/api/${v.attachment.path}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="ml-auto flex items-center gap-1 px-2 py-1 rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Download className="w-3 h-3" />
-                            {v.attachment.name}
-                          </a>
-                        )}
-                        {v.attachment && !perm.canDownloadCode && (
-                          <span className="ml-auto flex items-center gap-1 text-[10px] text-[#969699]"><Paperclip className="w-3 h-3" />{v.attachment.name}（只读）</span>
-                        )}
-                        {!v.attachment && (
-                          <span className="ml-auto text-[10px] text-[#969699]">无附件</span>
+                        {/* 文件夹附件 - 显示文件数量 */}
+                        {v.attachments && v.attachments.length > 0 ? (
+                          <span className="ml-auto flex items-center gap-1 text-[10px] text-[#10b981]">
+                            <FolderOpen className="w-3 h-3" />{v.attachments.length} 个文件{!perm.canDownloadCode && '（只读）'}
+                          </span>
+                        ) : (
+                          <span className="ml-auto text-[10px] text-[#969699]">无文件</span>
                         )}
                       </div>
 
@@ -325,6 +334,26 @@ export default function CodeVersion() {
                           <pre className="text-xs text-[#f4f4f5] font-mono leading-relaxed bg-[#050507] rounded p-3 whitespace-pre-wrap">
                             {v.diff}
                           </pre>
+
+                          {/* 文件夹内文件下载列表 */}
+                          {v.attachments && v.attachments.length > 0 && perm.canDownloadCode && (
+                            <div className="mt-3">
+                              <h4 className="text-[10px] font-mono text-[#969699] uppercase tracking-wider mb-2">
+                                项目文件（{v.attachments.length}）
+                              </h4>
+                              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto scrollbar-thin">
+                                {v.attachments.map((att) => (
+                                  <a key={att.path} href={`${backendUrl()}/api/${att.path}`} target="_blank" rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-2 px-2 py-1 rounded bg-[#050507] hover:bg-[#1868d6]/10 text-xs text-[#1868d6] transition-colors">
+                                    <Download className="w-3 h-3 shrink-0" />
+                                    <span className="font-mono truncate">{att.name}</span>
+                                    <span className="ml-auto text-[10px] text-[#969699] shrink-0">{att.size}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           {/* Mini Git Graph for this file */}
                           <div className="mt-3">

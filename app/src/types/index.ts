@@ -147,8 +147,8 @@ export interface Issue {
 
 export interface FileVersion {
   id: string;
-  version: string; // "v1", "v2", "v3" ...
-  filename: string;
+  version: string; // "v0.0.1", "v0.0.2" ...
+  filename: string; // 项目文件夹名称
   projectId: string;
   projectName?: string; // 冗余记录项目名，便于在数据仓库中直接识别
   projectDescription?: string; // 冗余记录项目说明
@@ -159,7 +159,7 @@ export interface FileVersion {
   size: string;
   hash: string; // git-style hash
   parentId: string | null; // previous version id
-  attachment?: { name: string; path: string; size: string }; // 可选附件（存于私有数据仓库）
+  attachments?: { name: string; path: string; size: string }[]; // 整个项目文件夹的文件列表（存于私有数据仓库）
 }
 
 export interface CodeCommit {

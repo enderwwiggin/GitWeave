@@ -225,14 +225,26 @@ export default {
         // 构建要写入的文件列表
         const files = [];
 
-        // 附件：按项目名称/版本号存放
+        // 附件：整个项目文件夹，按 attachments/项目名/版本号/相对路径 存放
+        // 前端发送 payload.files = [{ relativePath, contentBase64, size }]
+        const projectName = safePathName(commit.projectName || commit.projectId);
+        const incoming = Array.isArray(payload.files) ? payload.files : [];
+        // 兼容旧的单文件字段
         if (payload.attachment && payload.attachment.contentBase64) {
-          const safeName = payload.attachment.name.replace(/[^\w.\-\u4e00-\u9fa5]/g, '_');
-          const projectName = safePathName(commit.projectName || commit.projectId);
-          const apath = `attachments/${projectName}/${version}/${safeName}`;
-          files.push({ path: apath, contentBase64: payload.attachment.contentBase64 });
-          commit.attachment = { name: payload.attachment.name, path: apath, size: payload.attachment.size || '' };
+          incoming.push({ relativePath: payload.attachment.name, contentBase64: payload.attachment.contentBase64, size: payload.attachment.size });
         }
+        const attachments = [];
+        for (const f of incoming) {
+          if (!f || !f.contentBase64) continue;
+          const rel = String(f.relativePath || f.name || 'file')
+            .split('/')
+            .map((seg) => safePathName(seg))
+            .join('/');
+          const apath = `attachments/${projectName}/${version}/${rel}`;
+          files.push({ path: apath, contentBase64: f.contentBase64 });
+          attachments.push({ name: f.relativePath || f.name || rel, path: apath, size: f.size || '' });
+        }
+        if (attachments.length) commit.attachments = attachments;
 
         // commits.json
         const next = [commit, ...commits];
