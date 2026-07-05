@@ -30,7 +30,7 @@ export default function CodeVersion() {
   const [commits, setCommits] = useState<FileVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
   const [filterProject, setFilterProject] = useState<string | null>(null);
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState(false);
@@ -70,21 +70,21 @@ export default function CodeVersion() {
   }, {} as Record<string, FileVersion[]>);
 
   const handleUpload = async () => {
-    if (!formFile || !formDesc || !formProject) return;
+    if (!formFile || !formProject) return;
     const uploader = users.find((u) => u.id === user?.id) ?? users[0];
     const history = commits.filter((c) => c.filename === formFile && c.projectId === formProject);
     const parent = history[0] ?? null;
     const proj = projects.find((p) => p.id === formProject);
     const commit: FileVersion = {
       id: `cm-${Date.now()}`,
-      version: `v${history.length + 1}`,
+      version: `v0.0.${history.length + 1}`,
       filename: formFile,
       projectId: formProject,
       projectName: proj?.name,
       projectDescription: proj?.description,
       uploader,
-      description: formDesc,
-      diff: formDiff.trim() || formDesc,
+      description: formDesc.trim() || '文件提交',
+      diff: formDiff.trim() || (formDesc.trim() || '文件提交'),
       timestamp: new Date().toLocaleString('sv').slice(0, 16),
       size: formAttach ? `${Math.max(1, Math.round(formAttach.size / 1024))}KB` : '—',
       hash: Array.from({ length: 7 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''),
@@ -99,10 +99,10 @@ export default function CodeVersion() {
         attachment = { name: formAttach.name, size: `${Math.max(1, Math.round(formAttach.size / 1024))}KB`, contentBase64: await fileToBase64(formAttach) };
       }
       const creds = { name: user?.name ?? '', password: users.find((u) => u.id === user?.id)?.password ?? '' };
-      await createCommit(commit, creds, attachment);
+      const saved = await createCommit(commit, creds, attachment);
+      setCommits((prev) => [saved, ...prev]); // 用后端返回的版本号/附件路径覆盖本地
       setUploadForm(false);
       setFormFile(''); setFormDesc(''); setFormDiff(''); setFormProject(''); setFormAttach(null);
-      setRefreshKey((k) => k + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -166,9 +166,8 @@ export default function CodeVersion() {
               </select>
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-[#969699] mb-1.5 block">版本描述</label>
-              <input
-                type="text"
+              <label className="text-xs text-[#969699] mb-1.5 block">提交说明（可选）</label>
+              <input type="text"
                 value={formDesc}
                 onChange={(e) => setFormDesc(e.target.value)}
                 placeholder="这个版本做了什么..."
@@ -198,7 +197,7 @@ export default function CodeVersion() {
           <div className="flex justify-end mt-4">
             <button
               onClick={handleUpload}
-              disabled={!formFile || !formDesc || !formProject || submitting}
+              disabled={!formFile || !formProject || submitting}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
             >
               {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />上传中...</> : <><Upload className="w-4 h-4" />确认上传（自动递增版本号）</>}
