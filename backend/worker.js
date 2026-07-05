@@ -102,6 +102,68 @@ async function ghPut(env, path, contentB64, message, sha) {
   return res.json();
 }
 
+// 单次提交写入多个文件（附件+commits.json 合并为一个 commit）
+// 避免产生两个独立 commit（attach xxx / commit xxx），仓库历史更干净
+async function ghBatchCommit(env, files, message) {
+  // files: [{ path, contentBase64 }]
+  // 1. 获取当前 HEAD 和基础 tree
+  const refRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/ref/heads/main`, {
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker' },
+  });
+  if (!refRes.ok) throw new Error(`获取 ref 失败: ${refRes.status} ${await refRes.text()}`);
+  const refData = await refRes.json();
+  const baseCommitSha = refData.object.sha;
+
+  const commitRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/commits/${baseCommitSha}`, {
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker' },
+  });
+  if (!commitRes.ok) throw new Error(`获取 commit 失败: ${commitRes.status} ${await commitRes.text()}`);
+  const commitData = await commitRes.json();
+  const baseTreeSha = commitData.tree.sha;
+
+  // 2. 为每个文件创建 blob
+  const treeEntries = [];
+  for (const f of files) {
+    const blobRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/blobs`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: f.contentBase64, encoding: 'base64' }),
+    });
+    if (!blobRes.ok) throw new Error(`创建 blob ${f.path} 失败: ${blobRes.status} ${await blobRes.text()}`);
+    const blobData = await blobRes.json();
+    treeEntries.push({ path: f.path, mode: '100644', type: 'blob', sha: blobData.sha });
+  }
+
+  // 3. 创建新 tree（基于旧 tree + 新增/修改的条目）
+  const treeRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/trees`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
+  });
+  if (!treeRes.ok) throw new Error(`创建 tree 失败: ${treeRes.status} ${await treeRes.text()}`);
+  const treeData = await treeRes.json();
+
+  // 4. 创建 commit
+  const newCommitRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/commits`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, tree: treeData.sha, parents: [baseCommitSha] }),
+  });
+  if (!newCommitRes.ok) throw new Error(`创建 commit 失败: ${newCommitRes.status} ${await newCommitRes.text()}`);
+  const newCommitData = await newCommitRes.json();
+
+  // 5. 更新 ref
+  const updateRefRes = await fetch(`${GH_API}/repos/${env.DATA_REPO}/git/refs/heads/main`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gitweave-worker', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sha: newCommitData.sha, force: false }),
+  });
+  if (!updateRefRes.ok) throw new Error(`更新 ref 失败: ${updateRefRes.status} ${await updateRefRes.text()}`);
+
+  return newCommitData;
+}
+
+
 // 生成附件路径：attachments/项目名称/版本号/文件名
 // 版本号按项目递增，从 v0.0.1 开始
 function nextProjectVersion(commits, projectId) {
@@ -156,24 +218,30 @@ export default {
         if (!commit || !commit.id) return json({ error: '缺少 commit 数据' }, env, 400);
 
         // 先读取 commits.json，以便按项目生成版本号
-        const { commits, sha } = await readCommits(env);
+        const { commits } = await readCommits(env);
         const version = nextProjectVersion(commits, commit.projectId);
         commit.version = version;
+
+        // 构建要写入的文件列表
+        const files = [];
 
         // 附件：按项目名称/版本号存放
         if (payload.attachment && payload.attachment.contentBase64) {
           const safeName = payload.attachment.name.replace(/[^\w.\-\u4e00-\u9fa5]/g, '_');
           const projectName = safePathName(commit.projectName || commit.projectId);
           const apath = `attachments/${projectName}/${version}/${safeName}`;
-          await ghPut(env, apath, payload.attachment.contentBase64, `attach ${safeName} for ${projectName}/${version}`);
+          files.push({ path: apath, contentBase64: payload.attachment.contentBase64 });
           commit.attachment = { name: payload.attachment.name, path: apath, size: payload.attachment.size || '' };
         }
 
+        // commits.json
         const next = [commit, ...commits];
+        files.push({ path: 'commits.json', contentBase64: b64encodeUtf8(JSON.stringify(next, null, 2)) });
+
         const uploader = commit.uploader || {};
         const uploaderInfo = [uploader.name, uploader.phone, uploader.email].filter(Boolean).join(' ');
         const message = `commit ${version} by ${uploaderInfo || 'unknown'}: ${commit.description || '文件提交'}`;
-        await ghPut(env, 'commits.json', b64encodeUtf8(JSON.stringify(next, null, 2)), message, sha);
+        await ghBatchCommit(env, files, message);
         return json({ ok: true, commit }, env);
       }
 
