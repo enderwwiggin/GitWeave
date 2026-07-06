@@ -56,7 +56,8 @@ function loadPool(): TeamMember[] {
       // 更新已有成员 + 追加新成员
       for (let i = 0; i < base.length; i++) {
         const ov = overrideMap.get(base[i].id);
-        if (ov) { base[i] = { ...base[i], ...ov }; overrideMap.delete(base[i].id); }
+        // localStorage 提供 phone/password/email/idCard，mockData 的 name/role/initials/color/userRole 是权威来源
+        if (ov) { base[i] = { ...ov, ...base[i], phone: ov.phone || base[i].phone, password: ov.password || base[i].password, email: ov.email ?? base[i].email, idCard: ov.idCard ?? base[i].idCard }; overrideMap.delete(base[i].id); }
       }
       // 追加 teamMembers 中不存在的新注册用户
       for (const m of overrideMap.values()) base.push(m);
@@ -105,7 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: '验证码不正确（应为身份证后6位+手机号后4位）' };
     }
 
-    if (users.some((m) => m.phone === phone.trim())) return { ok: false, error: '该手机号已注册' };
+    // 手机号冲突检查：排除本人（同名用户允许更新自己的手机号）
+    if (users.some((m) => m.name !== name.trim() && m.phone === phone.trim())) return { ok: false, error: '该手机号已被其他用户注册' };
 
     // 姓名匹配：如果后台已有同名成员（含 admin），自动对应其身份信息
     const matched = users.find((m) => m.name === name.trim());
