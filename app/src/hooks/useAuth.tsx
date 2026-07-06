@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { teamMembers } from '@/data/mockData';
 import type { TeamMember } from '@/types';
 
@@ -76,6 +76,17 @@ function persistPool(pool: TeamMember[]) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadUser);
   const [users, setUsers] = useState<TeamMember[]>(loadPool);
+
+  // 同步：如果 mockData 改了名字，刷新已登录用户的显示信息
+  useEffect(() => {
+    if (!user) return;
+    const fresh = users.find((m) => m.id === user.id);
+    if (fresh && (fresh.name !== user.name || fresh.initials !== user.initials || fresh.color !== user.color || fresh.role !== user.role || fresh.userRole !== user.userRole)) {
+      const updated = { id: fresh.id, name: fresh.name, initials: fresh.initials, color: fresh.color, role: fresh.role, userRole: fresh.userRole };
+      setUser(updated);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch { /* ignore */ }
+    }
+  }, [users]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 登录：姓名 + 密码
   const login = useCallback((name: string, password: string): { ok: boolean; error?: string } => {
