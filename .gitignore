@@ -8,3 +8,4 @@ app/dist/
 backend/.wrangler/
 gh-pages-deploy/
 backend/attachments
+.wrangler/
