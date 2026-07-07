@@ -273,7 +273,7 @@ export default {
       // 下载附件（读取，Worker 用令牌代理私有仓库文件）
       // 下载附件（从 R2 读取，零出站费）
       if (pathname.startsWith('/api/attachments/') && request.method === 'GET') {
-        const key = pathname.replace('/api/', '');
+        const key = decodeURIComponent(pathname.replace('/api/', ''));
         const obj = await env.ATTACHMENTS.get(key);
         if (!obj) return json({ error: '附件不存在' }, env, 404);
         const name = key.split('/').pop();
