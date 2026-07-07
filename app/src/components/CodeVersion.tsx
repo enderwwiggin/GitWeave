@@ -214,7 +214,10 @@ export default function CodeVersion() {
               />
             </div>
           </div>
-          <div className="flex justify-end mt-4">
+          <div className="flex justify-end items-center gap-3 mt-4">
+            {uploadForm && perm.canUploadCode && (formFiles.length === 0 || !formProject) && !formReading && !submitting && (
+              <span className="text-xs text-[#f59e0b]">需选择所属项目并选择项目文件夹后才能上传</span>
+            )}
             <button
               onClick={handleUpload}
               disabled={formFiles.length === 0 || !formProject || formReading || submitting}
@@ -251,7 +254,7 @@ export default function CodeVersion() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <FileCode className="w-10 h-10 text-[#1f1f22] mb-3" />
             <p className="text-sm text-[#969699]">暂无版本记录</p>
-            <p className="text-xs text-[#969699] mt-1">{isAdmin ? '点击「上传新版本」提交第一个文件' : '管理员上传后将在此显示'}</p>
+            <p className="text-xs text-[#969699] mt-1">点击「上传项目文件」提交第一个文件</p>
           </div>
         ) : Object.entries(grouped).map(([filename, versions]) => (
           <div key={filename} className="glass-panel rounded-lg overflow-hidden">
