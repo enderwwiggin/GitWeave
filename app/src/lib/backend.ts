@@ -66,6 +66,7 @@ export async function createCommit(
   // 先算版本号，逐文件上传到 R2（避免大请求体超 Worker CPU 限制）
   const version = nextProjectVersion(existingCommits ?? [], commit.projectId);
   const projectName = commit.projectName || commit.projectId;
+  const folderName = commit.filename || 'unknown';
 
   const uploadedFiles: { relativePath: string; size: string }[] = [];
   if (files && files.length > 0) {
@@ -79,6 +80,7 @@ export async function createCommit(
           headers: { 'Content-Type': 'application/json', ...authHeaders(creds) },
           body: JSON.stringify({
             projectName,
+            folderName,
             version,
             relativePath: f.relativePath,
             contentBase64: f.contentBase64,

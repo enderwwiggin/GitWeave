@@ -224,6 +224,7 @@ export default {
 
         // 附件元数据（文件已通过 /api/upload 逐个上传到 R2）
         const projectName = safePathName(commit.projectName || commit.projectId);
+        const folderName = safePathName(commit.filename || 'unknown');
         const incoming = Array.isArray(payload.files) ? payload.files : [];
         const attachments = incoming
           .filter((f) => f && f.relativePath)
@@ -232,11 +233,26 @@ export default {
               .split('/')
               .map((seg) => safePathName(seg))
               .join('/');
-            return { name: f.relativePath, path: `attachments/${projectName}/${version}/${rel}`, size: f.size || '' };
+            return { name: f.relativePath, path: `attachments/${projectName}/${folderName}/${version}/${rel}`, size: f.size || '' };
           });
         if (attachments.length) commit.attachments = attachments;
 
-        // 只写 commits.json 到 GitHub（附件已存 R2）
+        // 写索引到 GitHub 仓库 attachments/项目名/文件夹名/版本号/index.json
+        if (attachments.length) {
+          const indexPath = `attachments/${projectName}/${folderName}/${version}/index.json`;
+          const indexData = {
+            version,
+            projectName: commit.projectName || commit.projectId,
+            folderName: commit.filename,
+            uploader: commit.uploader?.name || 'unknown',
+            timestamp: commit.timestamp,
+            description: commit.description,
+            files: attachments.map((a) => ({ name: a.name, path: a.path, size: a.size })),
+          };
+          await ghPut(env, indexPath, b64encodeUtf8(JSON.stringify(indexData, null, 2)), `index ${version} ${folderName}`);
+        }
+
+        // 写 commits.json 到 GitHub
         const next = [commit, ...commits];
         const uploader = commit.uploader || {};
         const uploaderInfo = [uploader.name, uploader.phone, uploader.email].filter(Boolean).join(' ');
@@ -287,12 +303,13 @@ export default {
         }
         const payload = await request.json();
         const projectName = safePathName(payload.projectName || 'unknown');
+        const folderName = safePathName(payload.folderName || 'unknown');
         const version = String(payload.version || 'v0.0.1');
         const rel = String(payload.relativePath || 'file')
           .split('/')
           .map((seg) => safePathName(seg))
           .join('/');
-        const key = `attachments/${projectName}/${version}/${rel}`;
+        const key = `attachments/${projectName}/${folderName}/${version}/${rel}`;
         const bin = Uint8Array.from(atob(payload.contentBase64 || ''), (c) => c.charCodeAt(0));
         await env.ATTACHMENTS.put(key, bin);
         return json({ ok: true, path: key, name: payload.relativePath || rel, size: payload.size || '' }, env);
