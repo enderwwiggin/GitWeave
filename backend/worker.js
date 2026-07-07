@@ -296,23 +296,23 @@ export default {
           },
         });
       }
-      // 逐文件上传到 R2（避免大请求体超 Worker CPU 限制）
+      // 逐文件上传到 R2（二进制直传，无 base64 开销）
       if (pathname === '/api/upload' && request.method === 'POST') {
         if (!isMember(env, request)) {
           return json({ error: '无权限：请登录后再上传' }, env, 401);
         }
-        const payload = await request.json();
-        const projectName = safePathName(payload.projectName || 'unknown');
-        const folderName = safePathName(payload.folderName || 'unknown');
-        const version = String(payload.version || 'v0.0.1');
-        const rel = String(payload.relativePath || 'file')
-          .split('/')
-          .map((seg) => safePathName(seg))
-          .join('/');
+        const url = new URL(request.url);
+        const projectName = safePathName(url.searchParams.get('projectName') || 'unknown');
+        const folderName = safePathName(url.searchParams.get('folderName') || 'unknown');
+        const version = String(url.searchParams.get('version') || 'v0.0.1');
+        const relativePath = String(url.searchParams.get('relativePath') || 'file');
+        const rel = relativePath.split('/').map((seg) => safePathName(seg)).join('/');
         const key = `attachments/${projectName}/${folderName}/${version}/${rel}`;
-        const bin = Uint8Array.from(atob(payload.contentBase64 || ''), (c) => c.charCodeAt(0));
-        await env.ATTACHMENTS.put(key, bin);
-        return json({ ok: true, path: key, name: payload.relativePath || rel, size: payload.size || '' }, env);
+        const bodyBytes = await request.arrayBuffer();
+        await env.ATTACHMENTS.put(key, bodyBytes, {
+          httpMetadata: { contentType: 'application/octet-stream' },
+        });
+        return json({ ok: true, path: key, name: relativePath, size: `${Math.max(1, Math.round(bodyBytes.byteLength / 1024))}KB` }, env);
       }
 
       // 项目覆盖层（读取，开放）：added=新增项目，removedIds=被移除的预置项目id

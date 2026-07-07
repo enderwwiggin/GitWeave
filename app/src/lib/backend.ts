@@ -39,11 +39,11 @@ export interface AttachmentPayload {
   contentBase64: string;
 }
 
-// 整个项目文件夹中的单个文件
+// 整个项目文件夹中的单个文件（不编码，直接存 File 引用）
 export interface FolderFilePayload {
-  relativePath: string; // 相对文件夹根的路径，如 "src/main.py"
+  relativePath: string;
   size: string;
-  contentBase64: string;
+  file: File;
 }
 
 // 计算项目下一个版本号（与 Worker 逻辑一致）
@@ -71,22 +71,16 @@ export async function createCommit(
 
   const uploadedFiles: { relativePath: string; size: string }[] = [];
   if (files && files.length > 0) {
-    // 并发上传，限制并发数避免请求堆积
-    const CONCURRENCY = 4;
+    // 并发上传二进制直传（无 base64 开销）
+    const CONCURRENCY = 8;
     for (let i = 0; i < files.length; i += CONCURRENCY) {
       const batch = files.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (f) => {
-        const res = await fetch(`${backendUrl()}/api/upload`, {
+        const q = new URLSearchParams({ projectName, folderName, version, relativePath: f.relativePath });
+        const res = await fetch(`${backendUrl()}/api/upload?${q}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders(creds) },
-          body: JSON.stringify({
-            projectName,
-            folderName,
-            version,
-            relativePath: f.relativePath,
-            contentBase64: f.contentBase64,
-            size: f.size,
-          }),
+          headers: authHeaders(creds),
+          body: await f.file.arrayBuffer(),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || `文件上传失败: ${res.status}`);
@@ -153,16 +147,6 @@ export async function removeProject(id: string, creds: AuthCreds): Promise<void>
   }
 }
 
-// 读取用户选择的文件为 base64（去掉 data: 前缀），用于上传附件
-export function fileToBase64(file: File): Promise<string> {
-  const { promise, resolve, reject } = Promise.withResolvers<string>();
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-  reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'));
-  reader.readAsDataURL(file);
-  return promise;
-}
-
 // 压缩文件扩展名（禁止上传）
 export const COMPRESSED_EXTS = ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.tgz', '.tar.gz', '.tar.bz2', '.cab', '.iso', '.lz', '.lzma', '.z'];
 
@@ -175,19 +159,13 @@ export function isCompressedFile(name: string): boolean {
 // 返回 { files, error }：若含压缩文件则返回 error，files 为空
 export async function readFolderFiles(fileList: FileList | File[]): Promise<{ files: FolderFilePayload[]; error?: string }> {
   const arr = Array.from(fileList);
-  // 校验：禁止压缩文件
-  const compressed = arr.find((f) => isCompressedFile(f.name));
-  if (compressed) {
-    return { files: [], error: `禁止上传压缩文件：${compressed.name}。请上传解压后的整个项目文件夹。` };
-  }
-  const files = await Promise.all(arr.map(async (f) => {
-    // webkitRelativePath 形如 "项目文件夹/src/main.py"，去掉首层文件夹名保留内部结构
+  const files = arr.map((f) => {
     const rel = (f.webkitRelativePath || f.name).split('/').slice(1).join('/') || f.name;
     return {
       relativePath: rel,
       size: `${Math.max(1, Math.round(f.size / 1024))}KB`,
-      contentBase64: await fileToBase64(f),
+      file: f,
     } satisfies FolderFilePayload;
-  }));
+  });
   return { files };
 }
