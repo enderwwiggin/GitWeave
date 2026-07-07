@@ -6,7 +6,8 @@ import type { FileVersion, Project } from '@/types';
 const URL_KEY = 'gitweave_backend_url';
 
 // 已部署的团队后端地址（员工无需配置即可读取）。为空则回退 localStorage 演示模式。
-const BAKED_BACKEND_URL = 'https://gitweave-backend.2429910092.workers.dev';
+// 生产环境用 BAKED_BACKEND_URL；测试镜像可通过 VITE_BACKEND_URL 环境变量覆盖。
+const BAKED_BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'https://gitweave-backend.2429910092.workers.dev';
 
 export function backendUrl(): string {
   const v = (localStorage.getItem(URL_KEY) || BAKED_BACKEND_URL).trim();

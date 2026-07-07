@@ -1,0 +1,13 @@
+name = "gitweave-backend-staging"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# 普通变量
+[vars]
+DATA_REPO = "enderwwiggin/gitweave-data-staging"
+ALLOW_ORIGIN = "https://enderwwiggin.github.io"
+
+# R2 存储桶 — 测试镜像用独立 bucket
+[[r2_buckets]]
+bucket_name = "gitweave-attachments-staging"
+binding = "ATTACHMENTS"

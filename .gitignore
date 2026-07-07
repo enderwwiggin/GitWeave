@@ -7,5 +7,6 @@ app/dist/
 # Cloudflare wrangler local cache/state
 backend/.wrangler/
 gh-pages-deploy/
+gh-pages-deploy-staging/
 backend/attachments
 .wrangler/
