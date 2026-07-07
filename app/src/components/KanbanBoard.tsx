@@ -309,6 +309,29 @@ export default function KanbanBoard() {
   const [npCategory, setNpCategory] = useState('');
   const [npBusy, setNpBusy] = useState(false);
   const [projError, setProjError] = useState<string | null>(null);
+  // 类别管理：预置 + 用户自定义，持久化到 localStorage
+  const [categories, setCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('gitweave_categories');
+      if (saved) return JSON.parse(saved) as string[];
+    } catch { /* ignore */ }
+    return ['UMI系列', '触觉手套', '机械臂', 'Ego系列', '机器人', '其他'];
+  });
+  const [showNewCat, setShowNewCat] = useState(false);
+  const [newCat, setNewCat] = useState('');
+
+  const persistCategories = (next: string[]) => {
+    setCategories(next);
+    try { localStorage.setItem('gitweave_categories', JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  const handleAddCategory = () => {
+    const cat = newCat.trim();
+    if (!cat || categories.includes(cat)) { setShowNewCat(false); setNewCat(''); return; }
+    persistCategories([...categories, cat]);
+    setNpCategory(cat);
+    setShowNewCat(false);
+    setNewCat('');
+  };
 
   const [projectIssues, setProjectIssues] = useState<Record<string, string[]>>({});
   const selectedProject = filterProject ? projects.find((p) => p.id === filterProject) : null;
@@ -433,7 +456,7 @@ export default function KanbanBoard() {
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold text-[#f4f4f5]">项目看板</h2>
+          <h2 className="text-xl font-semibold text-[#f4f4f5]">任务看板</h2>
           <span className="text-xs font-mono text-[#969699] bg-[#1f1f22] px-2 py-1 rounded-full">{filteredTasks.length} 任务</span>
         </div>
         <div className="flex items-center gap-2">
@@ -583,11 +606,38 @@ export default function KanbanBoard() {
                 </div>
                 <div>
                   <label className="text-xs text-[#969699] mb-1 block">所属类别</label>
-                  <select value={npCategory} onChange={(e) => setNpCategory(e.target.value)}
-                    className="w-full h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] focus:outline-none focus:border-[#1868d6]/50">
-                    <option value="">选择类别（可选）</option>
-                    {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  {showNewCat ? (
+                    <div className="flex items-center gap-1">
+                      <input type="text" autoFocus value={newCat} onChange={(e) => setNewCat(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') { setShowNewCat(false); setNewCat(''); } }}
+                        placeholder="输入新类别名称"
+                        className="flex-1 h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] placeholder-[#969699] focus:outline-none focus:border-[#1868d6]/50" />
+                      <button onClick={handleAddCategory} title="确认添加"
+                        className="shrink-0 w-9 h-9 rounded bg-[#1868d6] hover:bg-[#1868d6]/80 text-white flex items-center justify-center transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => { setShowNewCat(false); setNewCat(''); }} title="取消"
+                        className="shrink-0 w-9 h-9 rounded border border-[#1f1f22] text-[#969699] hover:text-[#f4f4f5] flex items-center justify-center transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <select value={npCategory} onChange={(e) => {
+                        if (e.target.value === '__new__') { setShowNewCat(true); setNpCategory(''); }
+                        else setNpCategory(e.target.value);
+                      }}
+                        className="flex-1 h-9 px-3 rounded bg-[#050507] border border-[#1f1f22] text-sm text-[#f4f4f5] focus:outline-none focus:border-[#1868d6]/50">
+                        <option value="">选择类别（可选）</option>
+                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">+ 新建类别...</option>
+                      </select>
+                      <button onClick={() => setShowNewCat(true)} title="新建类别"
+                        className="shrink-0 w-9 h-9 rounded bg-[#1868d6]/15 hover:bg-[#1868d6]/25 text-[#1868d6] flex items-center justify-center transition-colors">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs text-[#969699] mb-1 block">项目描述</label>

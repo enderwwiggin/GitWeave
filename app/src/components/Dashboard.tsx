@@ -21,7 +21,7 @@ import TodoList from './TodoList';
 
 const sidebarItems = [
   { id: 'overview', label: '概览', icon: LayoutDashboard },
-  { id: 'board', label: '项目看板', icon: KanbanSquare },
+  { id: 'board', label: '任务看板', icon: KanbanSquare },
   { id: 'issues', label: '问题追踪', icon: AlertCircle },
   { id: 'transfers', label: '移交轨迹', icon: ArrowRightLeft },
   { id: 'code', label: '项目文件上传', icon: FolderOpen },
