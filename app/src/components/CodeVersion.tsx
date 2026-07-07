@@ -140,7 +140,7 @@ export default function CodeVersion() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          {isAdmin && (
+          {perm.canUploadCode && (
             <button
               onClick={() => setUploadForm(!uploadForm)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1868d6] hover:bg-[#1868d6]/80 text-white text-sm font-medium transition-colors"
@@ -157,7 +157,7 @@ export default function CodeVersion() {
       )}
 
       {/* Upload Form */}
-      {uploadForm && isAdmin && (
+      {uploadForm && perm.canUploadCode && (
         <div className="glass-panel rounded-lg p-5 mb-4 fade-in-up">
           <h3 className="text-sm font-medium text-[#f4f4f5] mb-4">上传项目文件</h3>
           <div className="grid grid-cols-2 gap-4">
